@@ -14,6 +14,10 @@
   "author": "baseballyama",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "20.8.9"
+    "@types/node": "20.8.10",
+    "tiktoken-node": "0.0.6"
+  },
+  "dependencies": {
+    "openai": "4.14.2"
   }
 }
