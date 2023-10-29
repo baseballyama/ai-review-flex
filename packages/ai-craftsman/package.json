@@ -1,0 +1,19 @@
+{
+  "name": "ai-craftsman",
+  "version": "0.0.0",
+  "description": "AI based Code reviewer following your project rules",
+  "main": "./dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsc -d -w",
+    "build": "tsc -d",
+    "type:check": "tsc --noEmit",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "baseballyama",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "20.8.9"
+  }
+}
