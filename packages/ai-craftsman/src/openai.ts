@@ -16,14 +16,21 @@ export const chat = async (messages: OpenAI.ChatCompletionMessageParam[]) => {
     return acc + getTokenCount(message.content ?? "");
   }, 0);
 
-  const model =
-    tokenCount * 1.1 + 1024 < 4 * 1024 ? "gpt-3.5-turbo" : "gpt-3.5-turbo-16k";
-  const response = await openai.chat.completions.create({
-    model,
-    messages,
-    temperature: 0,
-    max_tokens: Math.min(1024, (16 * 1024 - tokenCount) * 0.9),
-  });
+  const model = tokenCount * 1.1 + 1024 < 8 * 1024 ? "gpt-4" : "gpt-4-32k";
+  const response = await openai.chat.completions.create(
+    {
+      model,
+      messages,
+      temperature: 0,
+      max_tokens: Math.trunc(Math.min(1024, (16 * 1024 - tokenCount) * 0.9)),
+    },
+    {
+      maxRetries: 2,
+      timeout: Math.trunc(
+        Math.max(90 * 1000, Math.min(1000 * 20, tokenCount / 10))
+      ),
+    }
+  );
 
   return response.choices[0]?.message?.content ?? "";
 };
