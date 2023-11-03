@@ -1,5 +1,7 @@
 {
-  "scripts": {},
+  "scripts": {
+    "build": "cd packages/ai-craftsman && pnpm build"
+  },
   "keywords": [],
   "devDependencies": {
     "@tsconfig/strictest": "2.0.2",

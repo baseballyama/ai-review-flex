@@ -28,6 +28,6 @@ export const getDiff = (targetBranch: string) => {
     const diff = execSync(`git --no-pager diff --minimal ${branch} ${diffFile}`)
       .toString()
       .trim();
-    return { file, diff };
+    return { file, diff, path: diffFile };
   });
 };

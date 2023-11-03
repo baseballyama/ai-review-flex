@@ -3,6 +3,13 @@ import { chunk } from "./diff.js";
 import { getTokenCount, chat } from "./openai.js";
 import { promiseAllWithConcurrencyLimit } from "./concurrent.js";
 
+const excludePatterns = [
+  /.*node_modules/,
+  /.*pnpm-lock.yaml$/,
+  /.*yarn.lock$/,
+  /.*package-lock.json$/,
+];
+
 const main = async () => {
   const baseref = process.env["BASE_REF"];
   if (baseref == null || baseref === "") {
@@ -10,7 +17,13 @@ const main = async () => {
   }
 
   const promises: (() => Promise<void>)[] = [];
-  for (const { diff } of getDiff(baseref)) {
+  for (const { diff, path } of getDiff(baseref)) {
+    if (excludePatterns.some((pattern) => pattern.test(path))) {
+      console.log(`SKIP REVIEW: ${path}`);
+      continue;
+    } else {
+      console.log(`RUN REVIEW: ${path}`);
+    }
     const chunked = chunk({
       source: diff,
       counter: getTokenCount,
@@ -35,7 +48,7 @@ const main = async () => {
     }
   }
 
-  await promiseAllWithConcurrencyLimit(promises, 5);
+  await promiseAllWithConcurrencyLimit(promises, 10);
 };
 
 void main();
