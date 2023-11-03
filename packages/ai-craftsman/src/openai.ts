@@ -25,5 +25,5 @@ export const chat = async (messages: OpenAI.ChatCompletionMessageParam[]) => {
     max_tokens: Math.min(1024, (16 * 1024 - tokenCount) * 0.9),
   });
 
-  console.log({ messages, response: response.choices[0]?.message });
+  return response.choices[0]?.message?.content ?? "";
 };
