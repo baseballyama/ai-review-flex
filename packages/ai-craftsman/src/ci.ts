@@ -1,4 +1,4 @@
-import { getDiff } from "./git.js";
+import { getDiff, postComment } from "./git.js";
 import { chunk } from "./diff.js";
 import { getTokenCount, chat } from "./openai.js";
 import { promiseAllWithConcurrencyLimit } from "./concurrent.js";
@@ -43,6 +43,7 @@ const main = async () => {
             role: "user",
           },
         ]);
+        postComment(path, 1, response);
         console.log({ source, response });
       });
     }
