@@ -28,7 +28,8 @@ const getPullNumberAndCommitId = () => {
 
 export const postComment = async (
   path: string,
-  position: number,
+  startLine: number,
+  endLine: number,
   body: string
 ) => {
   try {
@@ -41,7 +42,9 @@ export const postComment = async (
       pull_number: pullNumber,
       commit_id: commitId,
       path,
-      position,
+      start_line: startLine,
+      line: endLine,
+      side: "RIGHT",
       body,
     });
   } catch (error) {
@@ -69,9 +72,10 @@ export const getDiff = (targetBranch: string) => {
 
   return diffFiles.map((diffFile) => {
     const file = readFileSync(diffFile, "utf-8");
-    const diff = execSync(`git --no-pager diff --minimal ${branch} ${diffFile}`)
+    const diff = execSync(`git --no-pager diff ${branch} ${diffFile}`)
       .toString()
       .trim();
+
     return { file, diff, path: diffFile };
   });
 };
