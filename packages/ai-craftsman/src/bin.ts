@@ -1,7 +1,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseMarkdown, chunkMarkdownByLevel } from "./utils/markdown.js";
-import { isPrDraft, getDiff, postComment } from "./utils/git.js";
+import {
+  isPrDraft,
+  hasCommentByTheApp,
+  getDiff,
+  postComment,
+  postReviewComment,
+} from "./utils/git.js";
 import { splitForEachDiff } from "./utils/diff.js";
 import { promiseAllWithConcurrencyLimit } from "./utils/concurrent.js";
 import { env } from "./config.js";
@@ -38,8 +44,14 @@ const main = async () => {
     return;
   }
 
+  if (await hasCommentByTheApp()) {
+    console.log("Skip AI review because this PR has comment by the app.");
+    return;
+  }
+
   const rules = await readCodingRules();
   const promises: (() => Promise<void>)[] = [];
+  let commented = false;
   for (const { diff, path } of getDiff(env.github.baseRef)) {
     if (excludePatterns.some((pattern) => pattern.test(path))) {
       console.log(`SKIP REVIEW: ${path}`);
@@ -62,7 +74,8 @@ const main = async () => {
             if (env.debug) {
               console.debug(`Receive REVIEW (${randomId})`, comment);
             }
-            postComment(path, comment.start, comment.end, comment.body);
+            postReviewComment(path, comment.start, comment.end, comment.body);
+            commented = true;
           }
         });
       }
@@ -70,6 +83,10 @@ const main = async () => {
   }
 
   await promiseAllWithConcurrencyLimit(promises, 1);
+
+  if (!commented) {
+    postComment("Great! No problem found by AI Craftsman.");
+  }
 };
 
 void main();

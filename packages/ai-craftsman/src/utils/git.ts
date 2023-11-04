@@ -45,17 +45,15 @@ export const isPrDraft = async (): Promise<boolean> => {
   }
 };
 
-export const getCommentsOrderByCreatedAtDesc = async (path: string) => {
+export const getCommentsOrderByCreatedAtDesc = async () => {
   try {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
-    const { pullNumber, commitId } = await getPullNumberAndCommitId();
+    const { pullNumber } = await getPullNumberAndCommitId();
     const { data } = await octokit.rest.pulls.listReviewComments({
       owner,
       repo,
       pull_number: pullNumber,
-      commit_id: commitId,
-      path,
     });
 
     return data.sort((a, b) => {
@@ -69,7 +67,29 @@ export const getCommentsOrderByCreatedAtDesc = async (path: string) => {
   }
 };
 
-export const postComment = async (
+export const hasCommentByTheApp = async (): Promise<boolean> => {
+  const comments = await await getCommentsOrderByCreatedAtDesc();
+  return comments.some((c) => c.body.includes(`<!-- COMMIT_ID: `));
+};
+
+export const postComment = async (body: string) => {
+  try {
+    const octokit = getOctokit();
+    const { owner, repo } = getOwnerAndRepo();
+    const { pullNumber, commitId } = await getPullNumberAndCommitId();
+    await octokit.rest.pulls.createReview({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      commit_id: commitId,
+      body: body + "\n\n" + `<!-- COMMIT_ID: ${commitId} -->`,
+    });
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const postReviewComment = async (
   path: string,
   startLine: number,
   endLine: number,
