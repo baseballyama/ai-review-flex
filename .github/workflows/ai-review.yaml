@@ -39,6 +39,7 @@ jobs:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
           LANGUAGE: Japanese
           DEBUG: true
-          # CODING_GUIDE_PATH: GUIDE.md
-          # CODING_GUIDE_LEVEL: 2
-          CODING_GUIDE_READER: packages/ai-craftsman/dist/ci/codingGuide.js
+          CODING_GUIDE_PATH: GUIDE.md
+          CODING_GUIDE_LEVEL: 2
+          CODING_GUIDE_ENABLE_PATTERN: "AI Review.*ON"
+          # CODING_GUIDE_READER: packages/ai-craftsman/dist/ci/codingGuide.js

@@ -15,6 +15,7 @@ import { review } from "./usecase/review.js";
 
 const excludePatterns = [
   /.*node_modules/,
+  /.*bin\//,
   /.*pnpm-lock.yaml$/,
   /.*yarn.lock$/,
   /.*package-lock.json$/,
@@ -30,7 +31,8 @@ const readCodingRules = async (): Promise<string[]> => {
   if (codingGuide.path != null && codingGuide.level != null) {
     const markdown = await fs.promises.readFile(codingGuide.path, "utf-8");
     const parsed = parseMarkdown(markdown);
-    return chunkMarkdownByLevel(parsed, codingGuide.level);
+    const chunked = chunkMarkdownByLevel(parsed, codingGuide.level);
+    return chunked.filter((chunk) => codingGuide.enablePattern.test(chunk));
   }
 
   throw new Error(
