@@ -22,7 +22,6 @@ export const chat = async (messages: OpenAI.ChatCompletionMessageParam[]) => {
       model,
       messages,
       temperature: 0,
-      max_tokens: Math.trunc(Math.min(1024, (16 * 1024 - tokenCount) * 0.9)),
     },
     {
       maxRetries: 2,

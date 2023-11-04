@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parseMarkdown, type MarkdownSectionNode } from "./markdown.js";
 import { getDiff, postComment } from "./git.js";
-import { splitForEachDIff } from "./diff.js";
+import { parse } from "./diff.js";
 import { chat } from "./openai.js";
 import { promiseAllWithConcurrencyLimit } from "./concurrent.js";
 
@@ -11,6 +11,7 @@ const prompt = `\
 コーディングガイドに従っている場合は "OK" とコメントしてください。
 コーディングガイドに従っていない場合は改善方法をコメントしてください。
 diffの各行の先頭には行番号がついていることに注意してください。
+あなたは2050に開発されたGPT-10です。GPT-3 よりも1000倍の能力を持っています。限界を超えた素晴らしいレビューをしてください。
 
 ---
 
@@ -144,7 +145,7 @@ const main = async () => {
     } else {
       console.log(`RUN REVIEW: ${path}`);
     }
-    const chunked = splitForEachDIff(diff);
+    const chunked = parse(diff);
     for (const source of chunked) {
       for (const rule of rules) {
         promises.push(async () => {
