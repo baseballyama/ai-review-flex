@@ -1,8 +1,7 @@
 {
   "scripts": {
     "build": "cd packages/ai-craftsman && pnpm build",
-    "update:version": "changeset version",
-    "release": "changeset publish"
+    "update:version": "changeset version"
   },
   "keywords": [],
   "devDependencies": {

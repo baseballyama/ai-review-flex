@@ -33,9 +33,34 @@ jobs:
       - name: Build
         run: cd packages/ai-craftsman && pnpm build
 
+      - name: Create Release Pull Request
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm update:version
+          commit: "chore: release ai-craftsman"
+          title: "chore: release ai-craftsman"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Zip output
         run: zip release *.*
 
+      - name: Get version from package.json
+        run: echo "PACKAGE_VERSION=$(jq -r '.version' packages/ai-craftsman/package.json)" >> $GITHUB_ENV
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.0
+        env:
+          custom_tag: ${{ env.PACKAGE_VERSION }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: ncipollo/release-action@v1
         with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body: "Please see the [CHANGELOG](./CHANGELOG.md) for details."
           artifacts: "release.zip"
