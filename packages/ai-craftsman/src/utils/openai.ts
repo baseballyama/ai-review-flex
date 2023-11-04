@@ -27,7 +27,10 @@ export const chat = async (messages: OpenAI.ChatCompletionMessageParam[]) => {
   });
 
   if (env.debug) {
-    console.debug("Call OpenAI API", { body, response });
+    console.debug("Call OpenAI API", {
+      body: JSON.stringify(body, null, 2),
+      response: JSON.stringify(response, null, 2),
+    });
   }
 
   return response.choices[0]?.message?.content ?? "";

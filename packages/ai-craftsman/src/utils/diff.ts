@@ -7,40 +7,39 @@ export interface Diff {
 
 export const splitForEachDiff = (diff: string): Diff[] => {
   const lines = diff.split("\n");
-  const header = lines[0];
-  const index = lines[1];
-  const minus = lines[2];
-  const plus = lines[3];
-
   const diffs: Diff[] = [];
   let diffLines: string[] = [];
-  const currentDiffLines = { start: 0, end: 0 };
+  const currentDiffLines = { start: 1, end: 1 };
 
   const flush = () => {
     const hasAdd = diffLines.some((l) => l.startsWith("+"));
     const hasDelete = diffLines.some((l) => l.startsWith("-"));
     const type = hasAdd && hasDelete ? "modify" : hasAdd ? "add" : "delete";
-    const diffBody = diffLines.reduce((acc, cur, index) => {
-      const rawNumber = currentDiffLines.start + index;
-      const line = `${rawNumber + index} ${cur}`;
+    let currentRowNumber = currentDiffLines.start - 1;
+    const diffBody = diffLines.reduce((acc, cur) => {
+      const isDelete = cur.startsWith("-");
+      if (isDelete) return acc;
+      currentRowNumber += 1;
+      const line = `${currentRowNumber} ${cur}`;
       if (acc === "") return line;
       return `${acc}\n${line}`;
     }, "");
     diffs.push({
       startRow: currentDiffLines.start,
       endRow: currentDiffLines.end,
-      diff: `${header}\n${index}\n${minus}\n${plus}\n${diffBody}`,
+      diff: diffBody,
       type,
     });
   };
 
-  for (const line of lines.slice(5)) {
-    if (line.startsWith("@@")) {
+  for (const line of lines.slice(4)) {
+    const isHank = line.startsWith("@@");
+    if (isHank) {
       if (diffLines.length > 0) {
         flush();
       }
       diffLines = [line];
-      const [start, end] = line.match(/\+(\d+),(\d+)/)?.slice(1) ?? [];
+      const [, start, end] = line.match(/@@ -\d+,\d+ \+(\d+),(\d+) @@/) ?? [];
       currentDiffLines.start = Number(start) || 0;
       currentDiffLines.end = Number(end) || currentDiffLines.start;
     } else {

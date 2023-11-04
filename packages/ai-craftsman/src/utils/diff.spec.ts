@@ -1,95 +1,133 @@
 import { describe, test, expect } from "vitest";
-import { parse } from "./diff";
+import { splitForEachDiff } from "./diff";
 
 describe("source", () => {
-  const source = `\
-const PORT = 8080;
-const HOME_PATH = '/home';
-const ABOUT_PATH = '/about';
-const SUBMIT_PATH = '/submit';
+  const diff1 = `\
+diff --git a/example.txt b/example.txt
+index 2d6ed5b..0a4ef57 100644
+--- a/example.txt
++++ b/example.txt
+@@ -1,4 +1,3 @@
+-この行は削除されます。
+  この行は変更されていません。
+  この行も変更されていません。
+  この行もそのままです。`;
 
-function isPortAvailable(port) {
-  return port == PORT;
-}
+  const diff2 = `\
+diff --git a/example.txt b/example.txt
+index 0a4ef57..2d6ed5b 100644
+--- a/example.txt
++++ b/example.txt
+@@ -1,3 +1,4 @@
++この行は追加されました。
+  この行は変更されていません。
+  この行も変更されていません。
+  この行もそのままです。`;
 
-function listen(port, callback) {
-  callback({ type: 'GET', path: HOME_PATH });
-}
+  const diff3 = `\
+diff --git a/example.txt b/example.txt
+index 2d6ed5b..0a4ef57 100644
+--- a/example.txt
++++ b/example.txt
+@@ -1,4 +1,4 @@
+-この行は削除されます。
++この行は新しく追加されました。
+  この行は変更されていません。
+  この行も変更されていません。
+-この行も削除されます。
++この行も新しく追加されました。`;
 
-function routeToController(method, path, callback) {
-  callback();
-}
+  const diff4 = `\
+diff --git a/example.txt b/example.txt
+index 4e6d5ab..3f7a9c3 100644
+--- a/example.txt
++++ b/example.txt
+@@ -1,3 +1,3 @@
+-これは最初のセクションの古い行です。
++これは最初のセクションの新しい行です。
+  ここは最初のセクションの変更されていない行です。
+  ここも最初のセクションで変更されていません。
 
-function renderTemplate(template, callback) {
-  callback();
-}
+@@ -10,3 +10,12 @@
+  これは二番目のセクションの変更されていない行です。
+-これは二番目のセクションで削除される行です。
+  これも二番目のセクションの変更されていない行です。
 
-function fetchDataFromDB(key, callback) {
-  callback({ name: 'John', age: 30 });
-}
+@@ -20,2 +19,21 @@
+  これは三番目のセクションの変更されていない行です。
++これは三番目のセクションに追加される新しい行です。
+  これも三番目のセクションで変更されていません。`;
 
-function validateData(data) {
-  return data != null;
-}
+  test("splitForEachDiff", async () => {
+    expect(splitForEachDiff(diff1)).toStrictEqual([
+      {
+        startRow: 1,
+        endRow: 3,
+        diff: "1 @@ -1,4 +1,3 @@\n2   この行は変更されていません。\n3   この行も変更されていません。\n4   この行もそのままです。",
+        type: "delete",
+      },
+    ]);
 
-function saveToDB(data) {
-  print("Data saved.");
-}
+    expect(splitForEachDiff(diff2)).toStrictEqual([
+      {
+        startRow: 1,
+        endRow: 4,
+        diff:
+          "1 @@ -1,3 +1,4 @@\n" +
+          "2 +この行は追加されました。\n" +
+          "3   この行は変更されていません。\n" +
+          "4   この行も変更されていません。\n" +
+          "5   この行もそのままです。",
+        type: "add",
+      },
+    ]);
 
-function log(message) {
-  print("Log: " + message);
-}
+    expect(splitForEachDiff(diff3)).toStrictEqual([
+      {
+        startRow: 1,
+        endRow: 4,
+        diff:
+          "1 @@ -1,4 +1,4 @@\n" +
+          "2 +この行は新しく追加されました。\n" +
+          "3   この行は変更されていません。\n" +
+          "4   この行も変更されていません。\n" +
+          "5 +この行も新しく追加されました。",
+        type: "modify",
+      },
+    ]);
 
-function respondWithError(message) {
-  print("Error: " + message);
-}
-
-function isNotEmpty(data) {
-  return data != null;
-}
-
-function insertIntoTemplate(data) {
-  print("Inserting data into template.");
-}
-
-function print(message) {
-  // Simulate printing a message to the console
-  return "Printed: " + message;
-}
-
-function onRequest(req) {
-  routeToController(req.type, req.path, () => {
-    if (req.path == HOME_PATH) {
-      renderTemplate('home.html', () => {
-        populateData(() => {
-          fetchDataFromDB('home_data', (data) => {
-            if (isNotEmpty(data)) {
-              insertIntoTemplate(data);
-            } else {
-              log('No data to display');
-            }
-          });
-        });
-      });
-    } else if (req.path == ABOUT_PATH) {
-      renderTemplate('about.html', () => {});
-    } else {
-      renderTemplate('404.html', () => {});
-    }
-  });
-}
-
-function main() {
-  if (isPortAvailable(PORT)) {
-    listen(PORT, onRequest);
-  } else {
-    log(\`Port \${PORT} is not available\`);
-  }
-}
-
-main();`;
-
-  test("parse", async () => {
-    expect(parse(source).length).toEqual(85);
+    expect(splitForEachDiff(diff4)).toStrictEqual([
+      {
+        startRow: 1,
+        endRow: 3,
+        diff:
+          "1 @@ -1,3 +1,3 @@\n" +
+          "2 +これは最初のセクションの新しい行です。\n" +
+          "3   ここは最初のセクションの変更されていない行です。\n" +
+          "4   ここも最初のセクションで変更されていません。\n" +
+          "5 ",
+        type: "modify",
+      },
+      {
+        startRow: 10,
+        endRow: 12,
+        diff:
+          "10 @@ -10,3 +10,12 @@\n" +
+          "11   これは二番目のセクションの変更されていない行です。\n" +
+          "12   これも二番目のセクションの変更されていない行です。\n" +
+          "13 ",
+        type: "delete",
+      },
+      {
+        startRow: 19,
+        endRow: 21,
+        diff:
+          "19 @@ -20,2 +19,21 @@\n" +
+          "20   これは三番目のセクションの変更されていない行です。\n" +
+          "21 +これは三番目のセクションに追加される新しい行です。\n" +
+          "22   これも三番目のセクションで変更されていません。",
+        type: "add",
+      },
+    ]);
   });
 });

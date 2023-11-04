@@ -1,10 +1,10 @@
-const getEnv = <T extends boolean>(
+const getEnv = (
   key: string,
   option: {
     defaultValue?: string;
-    required?: T;
+    required?: boolean;
   } = {}
-): T extends true ? string : string | undefined => {
+): string => {
   const value = String(process.env[key] ?? "");
   if (!value && option.defaultValue) {
     return option.defaultValue;
@@ -26,8 +26,8 @@ export const env = {
   language: getEnv("LANGUAGE", { defaultValue: "English", required: true }),
   debug: getEnv("DEBUG")?.toLowerCase() === "true",
   codingGuide: {
-    reader: getEnv("CODING_GUIDE_READER"),
-    path: getEnv("CODING_GUIDE_PATH"),
+    reader: getEnv("CODING_GUIDE_READER") || undefined,
+    path: getEnv("CODING_GUIDE_PATH") || undefined,
     level: Number(getEnv("CODING_GUIDE_LEVEL")) || undefined,
   },
 };

@@ -1,9 +1,7 @@
 import { describe, test, expect } from "vitest";
-import { parseMarkdown } from "./markdown";
+import { parseMarkdown, chunkMarkdownByLevel } from "./markdown";
 
-describe("markdown", () => {
-  test("parseMarkdown", async () => {
-    const markdown = `\
+const markdown1 = `\
 # タイトル1
 
 これはタイトル1の内容です。
@@ -27,7 +25,27 @@ describe("markdown", () => {
 ## サブタイトル2-1
 
 これはサブタイトル2-1の内容です。`;
-    expect(parseMarkdown(markdown)).toStrictEqual({
+
+const markdown2 = `\
+## タイトル1
+
+これはタイトル1の内容です。
+
+### サブタイトル1-1
+
+これはサブタイトル1-1の内容です。
+
+## サブタイトル1-2
+
+これはサブタイトル1-2の内容です。
+
+# トップレベルタイトル
+
+これはトップレベルタイトルの内容です。`;
+
+describe("markdown", () => {
+  test("parseMarkdown", async () => {
+    expect(parseMarkdown(markdown1)).toStrictEqual({
       type: "root",
       children: [
         {
@@ -77,5 +95,48 @@ describe("markdown", () => {
         },
       ],
     });
+
+    expect(parseMarkdown(markdown2)).toStrictEqual({
+      type: "root",
+      children: [
+        {
+          type: "node",
+          title: "## タイトル1",
+          content: "\n\nこれはタイトル1の内容です。\n",
+          level: 2,
+          children: [
+            {
+              type: "node",
+              title: "### サブタイトル1-1",
+              content: "\n\nこれはサブタイトル1-1の内容です。\n",
+              level: 3,
+              children: [],
+            },
+          ],
+        },
+        {
+          type: "node",
+          title: "## サブタイトル1-2",
+          content: "\n\nこれはサブタイトル1-2の内容です。\n",
+          level: 2,
+          children: [],
+        },
+        {
+          type: "node",
+          title: "# トップレベルタイトル",
+          content: "\n\nこれはトップレベルタイトルの内容です。",
+          level: 1,
+          children: [],
+        },
+      ],
+    });
+  });
+
+  test("chunkMarkdownByLevel", async () => {
+    expect(chunkMarkdownByLevel(parseMarkdown(markdown1), 2)).toStrictEqual([
+      "## サブタイトル1-1\n\n\n\nこれはサブタイトル1-1の内容です。\n### サブサブタイトル1-1-1\n\n\n\nこれはサブサブタイトル1-1-1の内容です。\n",
+      "## サブタイトル1-2\n\n\n\nこれはサブタイトル1-2の内容です。\n",
+      "## サブタイトル2-1\n\n\n\nこれはサブタイトル2-1の内容です。",
+    ]);
   });
 });

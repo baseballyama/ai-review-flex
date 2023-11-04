@@ -19,12 +19,12 @@ const readCodingRules = async (): Promise<string[]> => {
   const { codingGuide } = env;
   if (codingGuide.reader != null) {
     const module = await import(path.resolve(codingGuide.reader));
-    return module.default() as string[];
+    return (await module.default()) as string[];
   }
   if (codingGuide.path != null && codingGuide.level != null) {
-    const markdown = await fs.promises.readFile("GUIDE.md", "utf-8");
+    const markdown = await fs.promises.readFile(codingGuide.path, "utf-8");
     const parsed = parseMarkdown(markdown);
-    return chunkMarkdownByLevel(parsed, 2);
+    return chunkMarkdownByLevel(parsed, codingGuide.level);
   }
 
   throw new Error(
@@ -39,15 +39,24 @@ const main = async () => {
     if (excludePatterns.some((pattern) => pattern.test(path))) {
       console.log(`SKIP REVIEW: ${path}`);
       continue;
-    } else {
-      console.log(`START REVIEW: ${path}`);
     }
     for (const df of splitForEachDiff(diff)) {
       if (df.type === "delete") continue;
       for (const rule of rules) {
+        const randomId = Math.random().toString(32).substring(2);
         promises.push(async () => {
+          if (env.debug) {
+            console.debug(`START REVIEW (${randomId})`, {
+              path,
+              rule,
+              diff: df.diff,
+            });
+          }
           const reviewComments = await review(rule, df.diff);
           for (const comment of reviewComments) {
+            if (env.debug) {
+              console.debug(`Receive REVIEW (${randomId})`, comment);
+            }
             postComment(path, comment.start, comment.end, comment.body);
           }
         });

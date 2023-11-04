@@ -1,3 +1,13 @@
+const walk = (
+  node: MarkdownSectionRoot | MarkdownSectionNode,
+  enter: (n: MarkdownSectionNode) => void
+) => {
+  for (const child of node.children) {
+    enter(child);
+    walk(child, enter);
+  }
+};
+
 export interface MarkdownSectionNode {
   type: "node";
   title: string;
@@ -17,10 +27,8 @@ export const chunkMarkdownByLevel = (
 ): string[] => {
   const getRule = (node: MarkdownSectionNode) => {
     let rule = `${node.title}\n\n${node.content}`;
-    if (node.children.length > 0) {
-      for (const child of node.children) {
-        rule += getRule(child);
-      }
+    for (const child of node.children) {
+      rule += getRule(child);
     }
     return rule;
   };
@@ -63,17 +71,16 @@ export const parseMarkdown = (markdown: string): MarkdownSectionRoot => {
     level: number
   ): MarkdownSectionRoot | MarkdownSectionNode => {
     let parent: MarkdownSectionRoot | MarkdownSectionNode = root;
-    for (let i = 0; i < level; i++) {
-      const buf: MarkdownSectionNode | undefined =
-        parent.children[parent.children.length - 1];
-      if (buf == null) return parent;
-      parent = buf;
-    }
+    walk(root, (node) => {
+      if (node.level === level) {
+        parent = node;
+      }
+    });
     return parent;
   };
 
   for (const line of lines) {
-    const level = (line.match(/^#+\s/)?.[0]?.length ?? 0) - 1;
+    const level = line.match(/^\s*(#+)\s/)?.[1]?.length ?? -1;
     const title = line.trim();
 
     if (level === -1) {

@@ -8,7 +8,7 @@ const buildPrompt = (codinfRule: string) => {
   return `\
 あなたは世界最高峰のプログラマーです。あなたの仕事はGitHubのdiffを見てコードレビューをすることです。
 以下のdiffに対して以下のコーディングガイドに従っているかをレビューしてください。
-コーディングガイドに従っている場合は "OK" とコメントしてください。
+コーディングガイドに従っている場合は "OK" とだけコメントしてください。
 コーディングガイドに従っていない場合は改善方法をコメントしてください。
 diffの各行の先頭には行番号がついていることに注意してください。
 
@@ -47,6 +47,7 @@ const appendCodingRule = (body: string, codingRule: string) => {
   const detail = `\
 <details>
 <summary>Reference: ${name?.replace(/^\s*#*?\s*/, "")}</summary>
+
 ${rest.join("\n")}
 </details>`;
 
