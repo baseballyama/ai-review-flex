@@ -52,7 +52,7 @@ const main = async () => {
               diff: df.diff,
             });
           }
-          const reviewComments = await review(rule, df.diff);
+          const reviewComments = await review(rule, df.diff, env.language);
           for (const comment of reviewComments) {
             if (env.debug) {
               console.debug(`Receive REVIEW (${randomId})`, comment);

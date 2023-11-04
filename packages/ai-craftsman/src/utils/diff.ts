@@ -38,7 +38,7 @@ export const splitForEachDiff = (diff: string): Diff[] => {
       if (diffLines.length > 0) {
         flush();
       }
-      diffLines = [line];
+      diffLines = [];
       const [, start, end] = line.match(/@@ -\d+,\d+ \+(\d+),(\d+) @@/) ?? [];
       currentDiffLines.start = Number(start) || 0;
       currentDiffLines.end = Number(end) || currentDiffLines.start;

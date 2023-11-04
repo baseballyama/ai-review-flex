@@ -4,32 +4,31 @@ import { chat } from "../utils/openai.js";
 // Request
 // ----------------------------------------------------------------------
 
-const buildPrompt = (codinfRule: string) => {
+const buildPrompt = (codingRule: string, language: string) => {
   return `\
-あなたは世界最高峰のプログラマーです。あなたの仕事はGitHubのdiffを見てコードレビューをすることです。
-以下のdiffに対して以下のコーディングガイドに従っているかをレビューしてください。
-コーディングガイドに従っている場合は "OK" とだけコメントしてください。
-コーディングガイドに従っていない場合は改善方法をコメントしてください。
-diffの各行の先頭には行番号がついていることに注意してください。
+You are the world's best programmer. Your task is to review code by looking at GitHub diffs.
+Please review the following diffs to see if they follow the coding guide below.
+If they follow the coding guide, just reply "OK".
+If not, please comment how to improve it.
+Note that each line of the diff is prefixed with a line number.
 
 ---
 
-コーディングガイドは以下です。
+The coding guide is below.
 
-${codinfRule}
+${codingRule}
 
 ---
 
-回答形式は以下です。
+The response format is as follows.
 
-## 改善点
-lines: {{指摘開始行}},{{指摘終了行}}
-{{ここに改善点を書いてください}}
+## Review Comment
+lines: {{Start line number for the comment}},{{End line for the comment}}
+{{Please write the review comment here in ${language}}}
 
-## 改善点
-lines: {{指摘開始行}},{{指摘終了行}}
-{{ここに改善点を書いてください}}
-`;
+## Review Comment
+lines: {{Start line number for the comment}},{{End line number for the comment}}
+{{Please write the review comment here in ${language}}}`;
 };
 
 // ----------------------------------------------------------------------
@@ -85,9 +84,10 @@ const parseResponse = (
   const comments: ReviewComment[] = [];
   let buf = "";
   const lines =
-    response.match(/.*?((#+)?\s*改善点[\s\S]*)/m)?.[0].split("\n") ?? [];
+    response.match(/.*?((#+)?\s*Review Comment[\s\S]*)/m)?.[0].split("\n") ??
+    [];
   for (const line of lines) {
-    if (line?.match(/^(#+)?\s*改善点/)) {
+    if (line?.match(/^(#+)?\s*Review Comment/)) {
       const comment = buildComment(buf, codingRule);
       if (comment != null) {
         comments.push(comment);
@@ -115,11 +115,12 @@ const parseResponse = (
 
 export const review = async (
   codingRule: string,
-  diff: string
+  diff: string,
+  language: string
 ): Promise<ReviewComment[]> => {
   const response = await chat([
     {
-      content: buildPrompt(codingRule),
+      content: buildPrompt(codingRule, language),
       role: "system",
     },
     {

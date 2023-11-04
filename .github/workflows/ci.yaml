@@ -37,6 +37,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          LANGUAGE: Japanese
           DEBUG: true
           # CODING_GUIDE_PATH: GUIDE.md
           # CODING_GUIDE_LEVEL: 2
