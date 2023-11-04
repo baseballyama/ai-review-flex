@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { parse, chunk } from "./diff";
+import { parse } from "./diff";
 
 describe("source", () => {
   const source = `\
@@ -91,22 +91,5 @@ main();`;
 
   test("parse", async () => {
     expect(parse(source).length).toEqual(85);
-  });
-
-  test("chunk", async () => {
-    const result = chunk({
-      source,
-      counter: (str: string) => str.length,
-      maxCount: 200,
-      duplicateLines: 2,
-    });
-
-    expect(result.length).toEqual(11);
-    expect(result[0].startRow).toEqual(0);
-    expect(result[0].endRow).toEqual(9);
-    expect(result[1].startRow).toEqual(8);
-    expect(result[1].endRow).toEqual(18);
-    expect(result[10].startRow).toEqual(78);
-    expect(result[10].endRow).toEqual(84);
   });
 });

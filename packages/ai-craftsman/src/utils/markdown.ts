@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 export interface MarkdownSectionNode {
   type: "node";
   title: string;
@@ -13,8 +11,35 @@ export interface MarkdownSectionRoot {
   children: MarkdownSectionNode[];
 }
 
-export const parseMarkdownFromFile = (path: string): MarkdownSectionRoot => {
-  return parseMarkdown(readFileSync(path, "utf-8"));
+export const chunkMarkdownByLevel = (
+  markdown: MarkdownSectionRoot,
+  level: number
+): string[] => {
+  const getRule = (node: MarkdownSectionNode) => {
+    let rule = `${node.title}\n\n${node.content}`;
+    if (node.children.length > 0) {
+      for (const child of node.children) {
+        rule += getRule(child);
+      }
+    }
+    return rule;
+  };
+
+  const rules: string[] = [];
+
+  const search = (node: MarkdownSectionNode, level: number) => {
+    if (node.level === level) {
+      rules.push(getRule(node));
+    }
+    for (const child of node.children) {
+      search(child, level);
+    }
+  };
+
+  for (const child of markdown.children) {
+    search(child, level);
+  }
+  return rules;
 };
 
 export const parseMarkdown = (markdown: string): MarkdownSectionRoot => {
