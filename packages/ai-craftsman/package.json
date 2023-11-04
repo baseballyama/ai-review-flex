@@ -8,7 +8,9 @@
     "dev": "tsc -d -w",
     "build": "tsc -d",
     "type:check": "tsc --noEmit",
-    "test:watch": "vitest"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:all": "pnpm type:check && pnpm test"
   },
   "keywords": [],
   "author": "baseballyama",

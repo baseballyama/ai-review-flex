@@ -1,4 +1,12 @@
-import { readFileSync } from "node:fs";
+const walk = (
+  node: MarkdownSectionRoot | MarkdownSectionNode,
+  enter: (n: MarkdownSectionNode) => void
+) => {
+  for (const child of node.children) {
+    enter(child);
+    walk(child, enter);
+  }
+};
 
 export interface MarkdownSectionNode {
   type: "node";
@@ -13,8 +21,33 @@ export interface MarkdownSectionRoot {
   children: MarkdownSectionNode[];
 }
 
-export const parseMarkdownFromFile = (path: string): MarkdownSectionRoot => {
-  return parseMarkdown(readFileSync(path, "utf-8"));
+export const chunkMarkdownByLevel = (
+  markdown: MarkdownSectionRoot,
+  level: number
+): string[] => {
+  const getRule = (node: MarkdownSectionNode) => {
+    let rule = `${node.title}\n\n${node.content}`;
+    for (const child of node.children) {
+      rule += getRule(child);
+    }
+    return rule;
+  };
+
+  const rules: string[] = [];
+
+  const search = (node: MarkdownSectionNode, level: number) => {
+    if (node.level === level) {
+      rules.push(getRule(node));
+    }
+    for (const child of node.children) {
+      search(child, level);
+    }
+  };
+
+  for (const child of markdown.children) {
+    search(child, level);
+  }
+  return rules;
 };
 
 export const parseMarkdown = (markdown: string): MarkdownSectionRoot => {
@@ -38,17 +71,16 @@ export const parseMarkdown = (markdown: string): MarkdownSectionRoot => {
     level: number
   ): MarkdownSectionRoot | MarkdownSectionNode => {
     let parent: MarkdownSectionRoot | MarkdownSectionNode = root;
-    for (let i = 0; i < level; i++) {
-      const buf: MarkdownSectionNode | undefined =
-        parent.children[parent.children.length - 1];
-      if (buf == null) return parent;
-      parent = buf;
-    }
+    walk(root, (node) => {
+      if (node.level === level) {
+        parent = node;
+      }
+    });
     return parent;
   };
 
   for (const line of lines) {
-    const level = (line.match(/^#+\s/)?.[0]?.length ?? 0) - 1;
+    const level = line.match(/^\s*(#+)\s/)?.[1]?.length ?? -1;
     const title = line.trim();
 
     if (level === -1) {

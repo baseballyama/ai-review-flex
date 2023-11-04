@@ -1,6 +1,7 @@
 export const promiseAllWithConcurrencyLimit = <T>(
   tasks: (() => Promise<T>)[],
-  limit: number
+  limit: number,
+  continueOnError = true
 ): Promise<T[]> => {
   return new Promise<T[]>(async (resolve, reject) => {
     let active = 0;
@@ -17,7 +18,11 @@ export const promiseAllWithConcurrencyLimit = <T>(
       try {
         result[index] = await task();
       } catch (e) {
-        return reject(e);
+        if (!continueOnError) {
+          return reject(e);
+        } else {
+          console.error(e);
+        }
       }
       active--;
       if (active === 0 && currentIndex >= tasks.length) {
