@@ -30,9 +30,6 @@ jobs:
       - name: prebuild
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: cd packages/ai-craftsman && pnpm build
-
       - name: Create Release Pull Request
         id: changesets
         uses: changesets/action@v1
@@ -44,23 +41,47 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Zip output
-        run: zip release *.*
+      - name: Fetch tags
+        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+
+      - name: Get latest release
+        id: latest_release
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const release = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            return release.data.tag_name;
 
       - name: Get version from package.json
         run: echo "PACKAGE_VERSION=$(jq -r '.version' packages/ai-craftsman/package.json)" >> $GITHUB_ENV
 
-      - name: Bump version and push tag
-        id: tag_version
-        uses: mathieudutour/github-tag-action@v6.0
+      - name: Check if PACKAGE_VERSION matches the latest tag
+        run: |
+          if [ "$PACKAGE_VERSION" == "$LATEST_TAG" ]; then
+            echo "Package version and latest tag match! Stopping the workflow."
+            exit 0
+          else
+            echo "Package version and latest tag do not match. Continuing the workflow."
+          fi
         env:
-          custom_tag: ${{ env.PACKAGE_VERSION }}
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
+          LATEST_TAG: ${{ steps.latest_release.outputs.result }}
+
+      - name: Build
+        run: cd packages/ai-craftsman && pnpm build
+
+      - name: Zip output
+        run: |
+          git clean -xdf
+          pnpm install --frozen-lockfile --prod
+          zip -r release ./
 
       - uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.tag_version.outputs.new_tag }}
-          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          tag: ${{ env.PACKAGE_VERSION }}
+          name: Release ${{ env.PACKAGE_VERSION }}
           body: "Please see the [CHANGELOG](./CHANGELOG.md) for details."
           artifacts: "release.zip"
