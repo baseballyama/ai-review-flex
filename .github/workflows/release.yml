@@ -11,8 +11,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  release:
-    name: Release
+  createReleasePr:
+    name: Create release PR
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -41,19 +41,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Fetch tags
-        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-
-      - name: Get latest release
-        id: latest_release
-        uses: actions/github-script@v5
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
         with:
-          script: |
-            const release = await github.rest.repos.getLatestRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            });
-            return release.data.tag_name;
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Get Latest tag
+        id: getLatestTag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          fallback: 0.0.0
 
       - name: Get version from package.json
         run: echo "PACKAGE_VERSION=$(jq -r '.version' packages/ai-craftsman/package.json)" >> $GITHUB_ENV
@@ -62,24 +70,29 @@ jobs:
         run: |
           if [ "$PACKAGE_VERSION" == "$LATEST_TAG" ]; then
             echo "Package version and latest tag match! Stopping the workflow."
-            exit 0
+            echo "SHOULD_SKIP=true" >> $GITHUB_ENV
           else
             echo "Package version and latest tag do not match. Continuing the workflow."
+            echo "SHOULD_SKIP=false" >> $GITHUB_ENV
           fi
         env:
           PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
-          LATEST_TAG: ${{ steps.latest_release.outputs.result }}
+          LATEST_TAG: ${{ steps.getLatestTag.outputs.tag }}
+
+      - name: Install dependencies
+        if: env.SHOULD_SKIP == 'false'
+        run: pnpm install --frozen-lockfile
 
       - name: Build
+        if: env.SHOULD_SKIP == 'false'
         run: cd packages/ai-craftsman && pnpm build
 
       - name: Zip output
-        run: |
-          git clean -xdf
-          pnpm install --frozen-lockfile --prod
-          zip -r release ./
+        if: env.SHOULD_SKIP == 'false'
+        run: zip -r release ./
 
       - uses: ncipollo/release-action@v1
+        if: env.SHOULD_SKIP == 'false'
         with:
           tag: ${{ env.PACKAGE_VERSION }}
           name: Release ${{ env.PACKAGE_VERSION }}
