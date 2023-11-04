@@ -28,6 +28,23 @@ const getPullNumberAndCommitId = async () => {
   return { pullNumber, commitId };
 };
 
+export const isPrDraft = async (): Promise<boolean> => {
+  try {
+    const octokit = getOctokit();
+    const { owner, repo } = getOwnerAndRepo();
+    const { pullNumber } = await getPullNumberAndCommitId();
+    const { data } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: pullNumber,
+    });
+    return data.draft === true || data.title.startsWith("[WIP]");
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+};
+
 export const getCommentsOrderByCreatedAtDesc = async (path: string) => {
   try {
     const octokit = getOctokit();

@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseMarkdown, chunkMarkdownByLevel } from "./utils/markdown.js";
-import { getDiff, postComment } from "./utils/git.js";
+import { isPrDraft, getDiff, postComment } from "./utils/git.js";
 import { splitForEachDiff } from "./utils/diff.js";
 import { promiseAllWithConcurrencyLimit } from "./utils/concurrent.js";
 import { env } from "./config.js";
@@ -33,6 +33,11 @@ const readCodingRules = async (): Promise<string[]> => {
 };
 
 const main = async () => {
+  if (await isPrDraft()) {
+    console.log("Skip AI review because this PR is draft.");
+    return;
+  }
+
   const rules = await readCodingRules();
   const promises: (() => Promise<void>)[] = [];
   for (const { diff, path } of getDiff(env.github.baseRef)) {

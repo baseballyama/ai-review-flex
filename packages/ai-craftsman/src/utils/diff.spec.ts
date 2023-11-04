@@ -90,7 +90,6 @@ index 4e6d5ab..3f7a9c3 100644
       },
     ]);
 
-    console.log(splitForEachDiff(diff4));
     expect(splitForEachDiff(diff4)).toStrictEqual([
       {
         startRow: 1,
