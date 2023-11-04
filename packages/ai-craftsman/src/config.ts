@@ -29,5 +29,8 @@ export const env = {
     reader: getEnv("CODING_GUIDE_READER") || undefined,
     path: getEnv("CODING_GUIDE_PATH") || undefined,
     level: Number(getEnv("CODING_GUIDE_LEVEL")) || undefined,
+    enablePattern: RegExp(
+      getEnv("CODING_GUIDE_ENABLE_PATTERN", { defaultValue: ".*" })
+    ),
   },
 };

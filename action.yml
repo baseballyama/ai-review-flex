@@ -1,0 +1,38 @@
+name: "AI Craftsman"
+description: "Fully customizable AI reviewer"
+inputs:
+  BASE_REF:
+    description: "Value of github.base_ref"
+    required: true
+  OPENAI_API_KEY:
+    description: "OpenAI API Key"
+    required: true
+  GITHUB_TOKEN:
+    description: "Value of secrets.GITHUB_TOKEN"
+    required: true
+  GITHUB_EVENT_PATH:
+    description: "Value of github.event_path"
+    required: true
+  LANGUAGE:
+    description: "Your preferred language. Example: English"
+    required: false
+    default: "English"
+  DEBUG:
+    description: "Set true to enable debug mode"
+    required: false
+  CODING_GUIDE_PATH:
+    description: "File path of the coding guide. Relative path from the project root."
+    required: false
+  CODING_GUIDE_LEVEL:
+    description: "Hierarchy of markdowns representing each rule."
+    required: false
+  CODING_GUIDE_ENABLE_PATTERN:
+    description: "Regular expression patterns for rules that enable review by AI."
+    required: false
+    default: ".*"
+  CODING_GUIDE_READER:
+    description: "File path of the custom script that returns each rule"
+    required: false
+runs:
+  using: "node20"
+  main: "packages/ai-craftsman/dist/bin.js"

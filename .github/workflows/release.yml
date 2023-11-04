@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: prebuild
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: cd packages/ai-craftsman && pnpm build
+
+      - name: Zip output
+        run: zip release *.*
+
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "release.zip"
