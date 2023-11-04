@@ -96,5 +96,5 @@ jobs:
         with:
           tag: ${{ env.PACKAGE_VERSION }}
           name: Release ${{ env.PACKAGE_VERSION }}
-          body: "Please see the [CHANGELOG](./CHANGELOG.md) for details."
+          body: "Please see the [CHANGELOG](./packages/ai-craftsman/CHANGELOG.md) for details."
           artifacts: "release.zip"
