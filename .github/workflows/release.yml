@@ -46,7 +46,7 @@ jobs:
 
       - name: Get latest release
         id: latest_release
-        uses: actions/github-script@v5
+        uses: actions/github-script@v6
         with:
           script: |
             const release = await github.rest.repos.getLatestRelease({
