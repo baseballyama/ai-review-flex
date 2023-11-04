@@ -74,7 +74,10 @@ jobs:
         run: cd packages/ai-craftsman && pnpm build
 
       - name: Zip output
-        run: zip release *.*
+        run: |
+          git clean -xdf
+          pnpm install --frozen-lockfile --prod
+          zip -r release ./
 
       - uses: ncipollo/release-action@v1
         with:
