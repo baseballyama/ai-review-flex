@@ -3,6 +3,8 @@ name: AI Review
 on:
   pull_request:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -12,6 +14,9 @@ jobs:
   test:
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/ai-review-flex'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,10 +38,10 @@ jobs:
       - name: AI Review
         run: node packages/ai-craftsman/dist/bin.js
         env:
-          BASE_REF: ${{ github.base_ref }}
+          # BASE_REF: ${{ github.base_ref }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          # GITHUB_EVENT_PATH: ${{ github.event_path }}
           LANGUAGE: Japanese
           CODING_GUIDE_PATH: ExampleOfCodigRules.md
           # CODING_GUIDE_READER: packages/ai-craftsman/dist/ci/codingGuide.js

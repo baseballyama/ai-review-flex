@@ -7,6 +7,7 @@ import {
   getDiff,
   postComment,
   postReviewComment,
+  getLatestCommitIdByTheApp,
 } from "./utils/git.js";
 import { splitForEachDiff } from "./utils/diff.js";
 import { promiseAllWithConcurrencyLimit } from "./utils/concurrent.js";
@@ -60,10 +61,26 @@ const main = async () => {
     return;
   }
 
+  let isIncremental = false;
+  if (env.github.comment) {
+    if (!env.github.comment.startsWith("/ai-review-flex")) {
+      console.log(
+        "Skip AI review because the comment doesn't starts with /ai-review-flex."
+      );
+      return;
+    }
+    if (env.github.comment.includes("incremental")) {
+      isIncremental = true;
+    }
+  }
+
   const rules = await readCodingRules();
   const promises: (() => Promise<void>)[] = [];
   let commented = false;
-  for (const { diff, path } of getDiff(env.github.baseRef)) {
+  const targetBranch = isIncremental
+    ? await getLatestCommitIdByTheApp()
+    : env.github.baseRef;
+  for (const { diff, path } of getDiff(targetBranch)) {
     if (excludePatterns.some((pattern) => pattern.test(path))) {
       console.log(`SKIP REVIEW: ${path}`);
       continue;

@@ -12,9 +12,8 @@ const getOctokit = () => {
 };
 
 const getOwnerAndRepo = () => {
-  const ownerAndRepo = env.github.repository?.split("/") ?? [];
-  const owner = ownerAndRepo[0] ?? "";
-  const repo = ownerAndRepo[1] ?? "";
+  const owner = env.github.repository?.owner?.name ?? "";
+  const repo = env.github.repository?.name ?? "";
   return { owner, repo };
 };
 
@@ -68,8 +67,14 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
 };
 
 export const hasCommentByTheApp = async (): Promise<boolean> => {
-  const comments = await await getCommentsOrderByCreatedAtDesc();
+  const comments = await getCommentsOrderByCreatedAtDesc();
   return comments.some((c) => c.body.includes(`<!-- COMMIT_ID: `));
+};
+
+export const getLatestCommitIdByTheApp = async (): Promise<string> => {
+  const comments = await getCommentsOrderByCreatedAtDesc();
+  const comment = comments.find((c) => c.body.includes(`<!-- COMMIT_ID: `));
+  return comment?.body.match(/<!-- COMMIT_ID:\s*(.+)\s*-->/)?.[1] ?? "";
 };
 
 export const postComment = async (body: string) => {
