@@ -1,4 +1,4 @@
-# ai-craftsman
+# AI Review Flex
 
 ## 0.2.0
 

@@ -24,7 +24,7 @@ importers:
         specifier: 0.34.6
         version: 0.34.6
 
-  packages/ai-craftsman:
+  packages/ai-reivew-flex:
     dependencies:
       '@actions/core':
         specifier: ^1.10.1

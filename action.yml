@@ -1,4 +1,4 @@
-name: "AI Craftsman"
+name: "AI Review Flex"
 description: "Fully customizable AI reviewer"
 inputs:
   OPENAI_API_KEY:
@@ -33,4 +33,4 @@ inputs:
     required: false
 runs:
   using: "node20"
-  main: "packages/ai-craftsman/dist/bin.js"
+  main: "packages/ai-reivew-flex/dist/bin.js"
