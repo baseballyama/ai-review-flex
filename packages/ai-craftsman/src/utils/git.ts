@@ -20,7 +20,7 @@ const getOwnerAndRepo = () => {
 
 const getPullNumberAndCommitId = async () => {
   const githubEvent = JSON.parse(await fs.promises.readFile(eventPath, "utf8"));
-  const pullNumber = github.context.payload.issue?.["pull_request"]?.number;
+  const pullNumber = github.context.payload.issue?.number ?? 0;
   const commitId = githubEvent.pull_request.head.sha ?? "";
   return { pullNumber, commitId };
 };
