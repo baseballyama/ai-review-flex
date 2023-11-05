@@ -126,6 +126,8 @@ export const postReviewComment = async (
 };
 
 export const getBaseRef = async () => {
+  const ref = github.context.payload.pull_request?.["base"]?.ref;
+  if (ref) return ref;
   const pullNumber = github.context.payload.issue?.["pull_request"]?.number;
   const owner = github.context.repo.owner;
   const repo = github.context.repo.repo;
