@@ -1,3 +1,5 @@
+import github from "@actions/github";
+
 const getEnv = (
   key: string,
   option: {
@@ -15,12 +17,25 @@ const getEnv = (
   return value;
 };
 
+const required = <T>(key: string, value: T | undefined): T => {
+  if (!value) throw new Error(`${key} should be set.`);
+  return value;
+};
+
 export const env = {
   github: {
     token: getEnv("GITHUB_TOKEN", { required: true }),
-    repository: getEnv("GITHUB_REPOSITORY", { required: true }),
+    repository: required(
+      "GITHUB_REPOSITORY",
+      github.context.payload?.repository
+    ),
     eventPath: getEnv("GITHUB_EVENT_PATH", { required: true }),
-    baseRef: getEnv("BASE_REF", { required: true }),
+    baseRef: required(
+      "github.base_ref",
+      String(github.context.payload.pull_request?.["base"]?.ref || "")
+    ),
+    comment:
+      String(github.context?.payload?.comment?.["body"] ?? "") || undefined,
   },
   openaiApiKey: getEnv("OPENAI_API_KEY", { required: true }),
   language: getEnv("LANGUAGE", { defaultValue: "English", required: true }),
