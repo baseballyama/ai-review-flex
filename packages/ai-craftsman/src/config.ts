@@ -28,9 +28,15 @@ export const env = {
   codingGuide: {
     reader: getEnv("CODING_GUIDE_READER") || undefined,
     path: getEnv("CODING_GUIDE_PATH") || undefined,
-    level: Number(getEnv("CODING_GUIDE_LEVEL")) || undefined,
+    level: Number(getEnv("CODING_GUIDE_LEVEL", { defaultValue: "2" })),
     enablePattern: RegExp(
-      getEnv("CODING_GUIDE_ENABLE_PATTERN", { defaultValue: ".*" })
+      getEnv("CODING_GUIDE_ENABLE_PATTERN", { defaultValue: "AI Review.*ON" })
+    ),
+    filePattern: RegExp(
+      getEnv("CODING_GUIDE_FILE_PATTERN", {
+        defaultValue: "File Pattern:\\s*(.+)$",
+      }),
+      "m"
     ),
   },
 };

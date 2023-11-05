@@ -115,6 +115,7 @@ const parseResponse = (
 
 export const review = async (
   codingRule: string,
+  filePath: string,
   diff: string,
   language: string
 ): Promise<ReviewComment[]> => {
@@ -124,7 +125,7 @@ export const review = async (
       role: "system",
     },
     {
-      content: diff,
+      content: `File path: ${filePath}\n\n${diff}`,
       role: "user",
     },
   ]);

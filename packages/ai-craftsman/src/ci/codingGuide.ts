@@ -1,10 +1,16 @@
 import * as fs from "node:fs";
-import { parseMarkdown, chunkMarkdownByLevel } from "../utils/markdown.js";
 
-export default async (): Promise<string[]> => {
+export default async (): Promise<{ rule: string; filePattern: RegExp }[]> => {
   const markdown = await fs.promises.readFile("GUIDE.md", "utf-8");
-  const parsed = parseMarkdown(markdown);
-  return chunkMarkdownByLevel(parsed, 2).filter((chunk) => {
-    return chunk.match(/AI Review.*ON/g);
-  });
+  return markdown
+    .split("## ")
+    .map((rule) => `## ${rule}`)
+    .filter(() => {
+      /** some filter process */
+      return true;
+    })
+    .map((rule) => {
+      const [, filePattern = ".*"] = rule.match(/File Pattern: (.+)$/m) ?? [];
+      return { rule, filePattern: RegExp(filePattern) };
+    });
 };
