@@ -8,6 +8,7 @@ import {
   postComment,
   postReviewComment,
   getLatestCommitIdByTheApp,
+  getBaseRef,
 } from "./utils/git.js";
 import { splitForEachDiff } from "./utils/diff.js";
 import { promiseAllWithConcurrencyLimit } from "./utils/concurrent.js";
@@ -79,7 +80,7 @@ const main = async () => {
   let commented = false;
   const targetBranch = isIncremental
     ? await getLatestCommitIdByTheApp()
-    : env.github.baseRef;
+    : await getBaseRef();
   for (const { diff, path } of getDiff(targetBranch)) {
     if (excludePatterns.some((pattern) => pattern.test(path))) {
       console.log(`SKIP REVIEW: ${path}`);

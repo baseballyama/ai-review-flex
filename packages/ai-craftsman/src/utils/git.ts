@@ -1,7 +1,4 @@
-/**
- * reference: https://gist.github.com/drwpow/86b11688babd6d1251b90e22ef7354ba
- */
-
+import github from "@actions/github";
 import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
@@ -126,6 +123,21 @@ export const postReviewComment = async (
   } catch (error) {
     console.error(error);
   }
+};
+
+export const getBaseRef = async () => {
+  const pullNumber = github.context.payload.issue?.["pull_request"]?.number;
+  const owner = github.context.repo.owner;
+  const repo = github.context.repo.repo;
+
+  const octokit = getOctokit();
+  const { data: pullRequest } = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: pullNumber,
+  });
+
+  return pullRequest.base.ref;
 };
 
 export interface Diff {
