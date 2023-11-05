@@ -2,8 +2,6 @@
 
 `AI Review Flex` is a versatile GitHub Action that employs AI to review code against project-specific guidelines. By interpreting markdown coding guides, it delivers tailored feedback for each pull request to uphold your coding standards.
 
-Absolutely, here is a suggested addition to the README that includes the goals of the `AI Review Flex` tool:
-
 ### Goals of AI Review Flex
 
 The primary goal of `AI Review Flex` is to streamline the code review process by integrating AI-powered analysis into your project workflow. This tool aims to:
