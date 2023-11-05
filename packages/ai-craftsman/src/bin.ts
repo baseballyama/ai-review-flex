@@ -1,15 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseMarkdown, chunkMarkdownByLevel } from "./utils/markdown.js";
-import {
-  isPrDraft,
-  hasCommentByTheApp,
-  getDiff,
-  postComment,
-  postReviewComment,
-  getLatestCommitIdByTheApp,
-  getBaseRef,
-} from "./utils/git.js";
+import * as git from "./utils/git.js";
 import { splitForEachDiff } from "./utils/diff.js";
 import { promiseAllWithConcurrencyLimit } from "./utils/concurrent.js";
 import { env } from "./config.js";
@@ -52,24 +44,24 @@ const readCodingRules = async (): Promise<ConfigRule[]> => {
 };
 
 const main = async () => {
-  if (await isPrDraft()) {
+  if (await git.isPrDraft()) {
     console.log("Skip AI review because this PR is draft.");
     return;
   }
 
   let isIncremental = false;
-  if (env.github.comment) {
-    if (!env.github.comment.startsWith("/ai-review-flex")) {
+  if (git.comment) {
+    if (!git.comment.startsWith("/ai-review-flex")) {
       console.log(
         "Skip AI review because the comment doesn't starts with /ai-review-flex."
       );
       return;
     }
-    if (env.github.comment.includes("incremental")) {
+    if (git.comment.includes("incremental")) {
       isIncremental = true;
     }
   } else {
-    if (await hasCommentByTheApp()) {
+    if (await git.hasCommentByTheApp()) {
       console.log("Skip AI review because this PR has comment by the app.");
       return;
     }
@@ -79,9 +71,9 @@ const main = async () => {
   const promises: (() => Promise<void>)[] = [];
   let commented = false;
   const targetBranch = isIncremental
-    ? await getLatestCommitIdByTheApp()
-    : await getBaseRef();
-  for (const { diff, path } of getDiff(targetBranch)) {
+    ? await git.getLatestCommitIdByTheApp()
+    : await git.getBaseRef();
+  for (const { diff, path } of git.getDiff(targetBranch)) {
     if (excludePatterns.some((pattern) => pattern.test(path))) {
       console.log(`SKIP REVIEW: ${path}`);
       continue;
@@ -112,7 +104,12 @@ const main = async () => {
             if (env.debug) {
               console.debug(`Receive REVIEW (${randomId})`, comment);
             }
-            postReviewComment(path, comment.start, comment.end, comment.body);
+            git.postReviewComment(
+              path,
+              comment.start,
+              comment.end,
+              comment.body
+            );
             commented = true;
           }
         });
@@ -123,7 +120,7 @@ const main = async () => {
   await promiseAllWithConcurrencyLimit(promises, 1);
 
   if (!commented) {
-    postComment("Great! No problem found by AI Review Flex.");
+    git.postComment("Great! No problem found by AI Review Flex.");
   }
 };
 
