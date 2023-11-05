@@ -56,11 +56,6 @@ const main = async () => {
     return;
   }
 
-  if (await hasCommentByTheApp()) {
-    console.log("Skip AI review because this PR has comment by the app.");
-    return;
-  }
-
   let isIncremental = false;
   if (env.github.comment) {
     if (!env.github.comment.startsWith("/ai-review-flex")) {
@@ -71,6 +66,11 @@ const main = async () => {
     }
     if (env.github.comment.includes("incremental")) {
       isIncremental = true;
+    }
+  } else {
+    if (await hasCommentByTheApp()) {
+      console.log("Skip AI review because this PR has comment by the app.");
+      return;
     }
   }
 

@@ -73,7 +73,6 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
 
 export const hasCommentByTheApp = async (): Promise<boolean> => {
   const comments = await getCommentsOrderByCreatedAtDesc();
-  console.log(comments);
   return comments.some((c) => c.body?.includes(`<!-- COMMIT_ID: `));
 };
 
