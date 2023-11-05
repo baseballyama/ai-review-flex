@@ -5,8 +5,8 @@
   "main": "./dist/index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsc -d -w",
-    "build": "cd src && tsc -d",
+    "dev": "tsc -w",
+    "build": "cd src && tsc",
     "type:check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
