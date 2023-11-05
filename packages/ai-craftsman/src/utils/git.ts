@@ -82,11 +82,10 @@ export const postComment = async (body: string) => {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
     const { pullNumber, commitId } = await getPullNumberAndCommitId();
-    await octokit.rest.pulls.createReview({
+    await octokit.rest.issues.createComment({
       owner,
       repo,
-      pull_number: pullNumber,
-      commit_id: commitId,
+      issue_number: pullNumber,
       body: body + "\n\n" + `<!-- COMMIT_ID: ${commitId} -->`,
     });
   } catch (error) {
