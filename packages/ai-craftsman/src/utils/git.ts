@@ -11,6 +11,7 @@ const getOctokit = () => {
 
 export const eventPath = process.env["GITHUB_EVENT_PATH"] ?? "";
 export const repository = github.context.payload?.repository;
+export const commentId = github.context?.payload?.comment?.["id"] ?? undefined;
 export const comment = github.context?.payload?.comment?.["body"] || undefined;
 
 const getOwnerAndRepo = () => {
@@ -18,22 +19,33 @@ const getOwnerAndRepo = () => {
   return { owner: owner?.login ?? "", repo: name ?? "" };
 };
 
-const getPullNumberAndCommitId = async () => {
-  const githubEvent = JSON.parse(await fs.promises.readFile(eventPath, "utf8"));
-  const pullNumber = github.context.payload.pull_request?.number ?? 0;
-  const commitId = githubEvent.pull_request.head.sha ?? "";
-  return { pullNumber, commitId };
+const getPullNumber = () => {
+  let number = github.context.payload.pull_request?.number;
+  if (number) return number;
+  number = github.context.issue?.number;
+  if (number) return number;
+  throw new Error("Cannot get pull request number.");
+};
+
+export const getCommitId = async (): Promise<string> => {
+  const octokit = getOctokit();
+  const { owner, repo } = getOwnerAndRepo();
+  const { data } = await octokit.rest.pulls.get({
+    owner,
+    repo,
+    pull_number: getPullNumber(),
+  });
+  return data.head.sha;
 };
 
 export const isPrDraft = async (): Promise<boolean> => {
   try {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
-    const { pullNumber } = await getPullNumberAndCommitId();
     const { data } = await octokit.rest.pulls.get({
       owner,
       repo,
-      pull_number: pullNumber,
+      pull_number: getPullNumber(),
     });
     return data.draft === true || data.title.startsWith("[WIP]");
   } catch (error) {
@@ -46,16 +58,15 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
   try {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
-    const { pullNumber } = await getPullNumberAndCommitId();
     const { data: reviews } = await octokit.rest.pulls.listReviewComments({
       owner,
       repo,
-      pull_number: pullNumber,
+      pull_number: getPullNumber(),
     });
     const { data: comments } = await octokit.rest.issues.listComments({
       owner,
       repo,
-      issue_number: pullNumber,
+      issue_number: getPullNumber(),
     });
 
     return [...reviews, ...comments].sort((a, b) => {
@@ -81,19 +92,46 @@ const appendCommitId = (body: string, commitId: string) => {
 export const getLatestCommitIdByTheApp = async (): Promise<string> => {
   const comments = await getCommentsOrderByCreatedAtDesc();
   const comment = comments.find((c) => c.body?.includes(`<!-- COMMIT_ID: `));
-  return comment?.body?.match(/<!-- COMMIT_ID:\s*(.+)\s*-->/)?.[1] ?? "";
+  return comment?.body?.match(/<!-- COMMIT_ID:\s*(.+?)\s*-->/)?.[1] ?? "";
+};
+
+export const reactToComment = async (
+  commentId: number,
+  content:
+    | "+1"
+    | "-1"
+    | "laugh"
+    | "confused"
+    | "heart"
+    | "hooray"
+    | "rocket"
+    | "eyes"
+) => {
+  try {
+    const octokit = getOctokit();
+    const { owner, repo } = getOwnerAndRepo();
+    const { data } = await octokit.rest.reactions.createForIssueComment({
+      owner,
+      repo,
+      comment_id: commentId,
+      content: content,
+    });
+    return data;
+  } catch (error) {
+    console.error(error);
+    return undefined;
+  }
 };
 
 export const postComment = async (body: string) => {
   try {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
-    const { pullNumber, commitId } = await getPullNumberAndCommitId();
     await octokit.rest.issues.createComment({
       owner,
       repo,
-      issue_number: pullNumber,
-      body: appendCommitId(body, commitId),
+      issue_number: getPullNumber(),
+      body: appendCommitId(body, await getCommitId()),
     });
   } catch (error) {
     console.error(error);
@@ -109,11 +147,11 @@ export const postReviewComment = async (
   try {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
-    const { pullNumber, commitId } = await getPullNumberAndCommitId();
+    const commitId = await getCommitId();
     await octokit.rest.pulls.createReviewComment({
       owner,
       repo,
-      pull_number: pullNumber,
+      pull_number: getPullNumber(),
       commit_id: commitId,
       path,
       start_line: startLine,
@@ -126,19 +164,18 @@ export const postReviewComment = async (
   }
 };
 
-export const getBaseRef = async () => {
-  const ref = github.context.payload.pull_request?.["base"]?.ref;
-  if (ref) return ref;
+export const getRef = async () => {
+  const base = github.context.payload.pull_request?.["base"]?.sha;
+  const head = github.context.payload.pull_request?.["head"]?.sha;
+  if (base && head) return { base, head };
   const { owner, repo } = getOwnerAndRepo();
-  const pullNumber = github.context.payload.issue?.["pull_request"]?.number;
   const octokit = getOctokit();
   const { data: pullRequest } = await octokit.pulls.get({
     owner,
     repo,
-    pull_number: pullNumber,
+    pull_number: getPullNumber(),
   });
-
-  return pullRequest.base.ref;
+  return { base: pullRequest.base.sha, head: pullRequest.head.sha };
 };
 
 export interface Diff {
@@ -146,19 +183,9 @@ export interface Diff {
   diff: string;
 }
 
-export const getDiff = (targetBranch: string): Diff[] => {
-  const currentBranch = execSync("git rev-parse --abbrev-ref HEAD")
-    .toString()
-    .trim();
-
-  const branch =
-    currentBranch === targetBranch
-      ? `HEAD~1..HEAD`
-      : `origin/${targetBranch}..${currentBranch}`;
-
-  const filePaths = execSync(
-    `git --no-pager diff --minimal --name-only ${branch}`
-  )
+export const getDiff = (base: string, head: string): Diff[] => {
+  const command = `git --no-pager diff --minimal --name-only ${base}...${head}`;
+  const filePaths = execSync(command)
     .toString()
     .split("\n")
     .map((ln) => ln.trim())
@@ -169,7 +196,7 @@ export const getDiff = (targetBranch: string): Diff[] => {
     if (!fs.existsSync(path)) {
       continue;
     }
-    const diff = execSync(`git --no-pager diff ${branch} ${path}`)
+    const diff = execSync(`git --no-pager diff ${base}...${head} ${path}`)
       .toString()
       .trim();
     diffs.push({ path, diff });

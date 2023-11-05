@@ -32,6 +32,7 @@ export const promiseAllWithConcurrencyLimit = <T>(
       }
     };
 
+    if (tasks.length === 0) return resolve([]);
     for (let i = 0; i < Math.min(limit, tasks.length); i++) {
       executeTask();
     }

@@ -50,7 +50,9 @@ const main = async () => {
   }
 
   let isIncremental = false;
-  if (git.comment) {
+  if (git.commentId && git.comment) {
+    await git.reactToComment(git.commentId, "eyes");
+
     if (!git.comment.startsWith("/ai-review-flex")) {
       console.log(
         "Skip AI review because the comment doesn't starts with /ai-review-flex."
@@ -69,11 +71,12 @@ const main = async () => {
 
   const rules = await readCodingRules();
   const promises: (() => Promise<void>)[] = [];
-  let commented = false;
-  const targetBranch = isIncremental
-    ? await git.getLatestCommitIdByTheApp()
-    : await git.getBaseRef();
-  for (const { diff, path } of git.getDiff(targetBranch)) {
+  let commentedCount = 0;
+  let { base, head } = await git.getRef();
+  if (isIncremental) {
+    base = await git.getLatestCommitIdByTheApp();
+  }
+  for (const { diff, path } of git.getDiff(base, head)) {
     if (excludePatterns.some((pattern) => pattern.test(path))) {
       console.log(`SKIP REVIEW: ${path}`);
       continue;
@@ -110,7 +113,7 @@ const main = async () => {
               comment.end,
               comment.body
             );
-            commented = true;
+            commentedCount += 1;
           }
         });
       }
@@ -118,8 +121,7 @@ const main = async () => {
   }
 
   await promiseAllWithConcurrencyLimit(promises, 1);
-
-  if (!commented) {
+  if (commentedCount === 0) {
     git.postComment("Great! No problem found by AI Review Flex.");
   }
 };
