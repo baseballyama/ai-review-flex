@@ -12,7 +12,7 @@ const getOctokit = () => {
 };
 
 const getOwnerAndRepo = () => {
-  const owner = env.github.repository?.owner?.name ?? "";
+  const owner = env.github.repository?.owner?.login ?? "";
   const repo = env.github.repository?.name ?? "";
   return { owner, repo };
 };
