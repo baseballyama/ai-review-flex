@@ -27,7 +27,11 @@ inputs:
     description: "Hierarchy of markdowns representing each rule."
     required: false
   CODING_GUIDE_ENABLE_PATTERN:
-    description: "Regular expression patterns for rules that enable review by AI."
+    description: "Regex patterns for rules that enable review by AI."
+    required: false
+    default: "AI Review.*ON"
+  CODING_GUIDE_FILE_PATTERN:
+    description: "Regex pattern to match file path that the rules should apply to."
     required: false
     default: ".*"
   CODING_GUIDE_READER:

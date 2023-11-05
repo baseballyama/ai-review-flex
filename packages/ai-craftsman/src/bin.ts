@@ -14,25 +14,34 @@ import { env } from "./config.js";
 import { review } from "./usecase/review.js";
 
 const excludePatterns = [
-  /.*node_modules/,
-  /.*bin\//,
+  /.*node_modules\//,
   /.*pnpm-lock.yaml$/,
   /.*yarn.lock$/,
   /.*package-lock.json$/,
-  /.*\.md$/,
 ];
 
-const readCodingRules = async (): Promise<string[]> => {
+interface ConfigRule {
+  rule: string;
+  filePattern: RegExp;
+}
+
+const readCodingRules = async (): Promise<ConfigRule[]> => {
   const { codingGuide } = env;
   if (codingGuide.reader != null) {
     const module = await import(path.resolve(codingGuide.reader));
-    return (await module.default()) as string[];
+    return (await module.default()) as ConfigRule[];
   }
-  if (codingGuide.path != null && codingGuide.level != null) {
+  if (codingGuide.path != null) {
     const markdown = await fs.promises.readFile(codingGuide.path, "utf-8");
     const parsed = parseMarkdown(markdown);
     const chunked = chunkMarkdownByLevel(parsed, codingGuide.level);
-    return chunked.filter((chunk) => codingGuide.enablePattern.test(chunk));
+    return chunked
+      .filter((chunk) => codingGuide.enablePattern.test(chunk))
+      .map((chunk) => {
+        const [, filePattern = "^$"] =
+          chunk.match(codingGuide.filePattern) ?? [];
+        return { rule: chunk, filePattern: RegExp(filePattern, "m") };
+      });
   }
 
   throw new Error(
@@ -62,6 +71,10 @@ const main = async () => {
     for (const df of splitForEachDiff(diff)) {
       if (df.type === "delete") continue;
       for (const rule of rules) {
+        if (!rule.filePattern.test(path)) {
+          console.log(`SKIP REVIEW: ${path} by ${rule.rule.split("\n")[0]}`);
+          continue;
+        }
         const randomId = Math.random().toString(32).substring(2);
         promises.push(async () => {
           if (env.debug) {
@@ -71,7 +84,12 @@ const main = async () => {
               diff: df.diff,
             });
           }
-          const reviewComments = await review(rule, df.diff, env.language);
+          const reviewComments = await review(
+            rule.rule,
+            path,
+            df.diff,
+            env.language
+          );
           for (const comment of reviewComments) {
             if (env.debug) {
               console.debug(`Receive REVIEW (${randomId})`, comment);
