@@ -1,5 +1,8 @@
 name: "AI Review Flex"
 description: "Fully customizable AI reviewer"
+branding:
+  icon: "shield"
+  color: "green"
 inputs:
   OPENAI_API_KEY:
     description: "OpenAI API Key"
