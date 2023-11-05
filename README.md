@@ -2,6 +2,27 @@
 
 `AI Review Flex` is a versatile GitHub Action that employs AI to review code against project-specific guidelines. By interpreting markdown coding guides, it delivers tailored feedback for each pull request to uphold your coding standards.
 
+Absolutely, here is a suggested addition to the README that includes the goals of the `AI Review Flex` tool:
+
+### Goals of AI Review Flex
+
+The primary goal of `AI Review Flex` is to streamline the code review process by integrating AI-powered analysis into your project workflow. This tool aims to:
+
+- **Enforce Coding Standards**: Automatically ensure that all code submissions adhere to your project's specific coding guidelines.
+- **Enhance Code Quality**: Assist in maintaining high code quality by providing smart, context-aware suggestions for improvement.
+- **Save Time**: Reduce the manual effort required in code reviews, allowing developers to focus on more complex tasks.
+- **Facilitate Learning**: Help team members learn coding standards and best practices through consistent, AI-driven feedback.
+- **Support Incremental Improvement**: Enable incremental reviews to gradually improve code within the context of recent changes.
+
+By integrating `AI Review Flex` into your GitHub Actions, you embrace a proactive approach to code quality that benefits the whole development team, leading to more reliable and maintainable codebases.
+
+### Non-Goals of AI Review Flex
+
+While `AI Review Flex` aims to enhance the code review process, it's important to note the boundaries of its functionality. The following are explicitly not goals of this tool:
+
+- **Non-Review Assistance**: `AI Review Flex` is not designed to provide support beyond code reviews, such as generating summaries for pull requests or conducting any form of project management.
+- **Standalone Library Provision**: The tool is solely created to function as a GitHub Action. It is not intended to be used as a library or to be integrated into other forms of CI/CD pipelines outside GitHub.
+
 ## Prerequisites
 
 To use `AI Review Flex`, make sure you have:

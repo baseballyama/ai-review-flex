@@ -1,7 +1,4 @@
-/**
- * reference: https://gist.github.com/drwpow/86b11688babd6d1251b90e22ef7354ba
- */
-
+import github from "@actions/github";
 import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
@@ -49,13 +46,18 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
     const { pullNumber } = await getPullNumberAndCommitId();
-    const { data } = await octokit.rest.pulls.listReviewComments({
+    const { data: reviews } = await octokit.rest.pulls.listReviewComments({
       owner,
       repo,
       pull_number: pullNumber,
     });
+    const { data: comments } = await octokit.rest.issues.listComments({
+      owner,
+      repo,
+      issue_number: pullNumber,
+    });
 
-    return data.sort((a, b) => {
+    return [...reviews, ...comments].sort((a, b) => {
       const aCreatedAt = new Date(a.created_at).getTime();
       const bCreatedAt = new Date(b.created_at).getTime();
       return bCreatedAt - aCreatedAt;
@@ -68,13 +70,17 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
 
 export const hasCommentByTheApp = async (): Promise<boolean> => {
   const comments = await getCommentsOrderByCreatedAtDesc();
-  return comments.some((c) => c.body.includes(`<!-- COMMIT_ID: `));
+  return comments.some((c) => c.body?.includes(`<!-- COMMIT_ID: `));
+};
+
+const appendCommitId = (body: string, commitId: string) => {
+  return `${body}\n\n` + `<!-- COMMIT_ID: ${commitId} -->`;
 };
 
 export const getLatestCommitIdByTheApp = async (): Promise<string> => {
   const comments = await getCommentsOrderByCreatedAtDesc();
-  const comment = comments.find((c) => c.body.includes(`<!-- COMMIT_ID: `));
-  return comment?.body.match(/<!-- COMMIT_ID:\s*(.+)\s*-->/)?.[1] ?? "";
+  const comment = comments.find((c) => c.body?.includes(`<!-- COMMIT_ID: `));
+  return comment?.body?.match(/<!-- COMMIT_ID:\s*(.+)\s*-->/)?.[1] ?? "";
 };
 
 export const postComment = async (body: string) => {
@@ -82,12 +88,11 @@ export const postComment = async (body: string) => {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
     const { pullNumber, commitId } = await getPullNumberAndCommitId();
-    await octokit.rest.pulls.createReview({
+    await octokit.rest.issues.createComment({
       owner,
       repo,
-      pull_number: pullNumber,
-      commit_id: commitId,
-      body: body + "\n\n" + `<!-- COMMIT_ID: ${commitId} -->`,
+      issue_number: pullNumber,
+      body: appendCommitId(body, commitId),
     });
   } catch (error) {
     console.error(error);
@@ -113,11 +118,26 @@ export const postReviewComment = async (
       start_line: startLine,
       line: endLine,
       side: "RIGHT",
-      body: body + "\n\n" + `<!-- COMMIT_ID: ${commitId} -->`,
+      body: appendCommitId(body, commitId),
     });
   } catch (error) {
     console.error(error);
   }
+};
+
+export const getBaseRef = async () => {
+  const pullNumber = github.context.payload.issue?.["pull_request"]?.number;
+  const owner = github.context.repo.owner;
+  const repo = github.context.repo.repo;
+
+  const octokit = getOctokit();
+  const { data: pullRequest } = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: pullNumber,
+  });
+
+  return pullRequest.base.ref;
 };
 
 export interface Diff {

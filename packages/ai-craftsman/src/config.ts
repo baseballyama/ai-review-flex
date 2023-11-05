@@ -30,10 +30,6 @@ export const env = {
       github.context.payload?.repository
     ),
     eventPath: getEnv("GITHUB_EVENT_PATH", { required: true }),
-    baseRef: required(
-      "github.base_ref",
-      String(github.context.payload.pull_request?.["base"]?.ref || "")
-    ),
     comment:
       String(github.context?.payload?.comment?.["body"] ?? "") || undefined,
   },

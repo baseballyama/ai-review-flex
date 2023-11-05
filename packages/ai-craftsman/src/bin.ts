@@ -8,6 +8,7 @@ import {
   postComment,
   postReviewComment,
   getLatestCommitIdByTheApp,
+  getBaseRef,
 } from "./utils/git.js";
 import { splitForEachDiff } from "./utils/diff.js";
 import { promiseAllWithConcurrencyLimit } from "./utils/concurrent.js";
@@ -56,11 +57,6 @@ const main = async () => {
     return;
   }
 
-  if (await hasCommentByTheApp()) {
-    console.log("Skip AI review because this PR has comment by the app.");
-    return;
-  }
-
   let isIncremental = false;
   if (env.github.comment) {
     if (!env.github.comment.startsWith("/ai-review-flex")) {
@@ -72,6 +68,11 @@ const main = async () => {
     if (env.github.comment.includes("incremental")) {
       isIncremental = true;
     }
+  } else {
+    if (await hasCommentByTheApp()) {
+      console.log("Skip AI review because this PR has comment by the app.");
+      return;
+    }
   }
 
   const rules = await readCodingRules();
@@ -79,7 +80,7 @@ const main = async () => {
   let commented = false;
   const targetBranch = isIncremental
     ? await getLatestCommitIdByTheApp()
-    : env.github.baseRef;
+    : await getBaseRef();
   for (const { diff, path } of getDiff(targetBranch)) {
     if (excludePatterns.some((pattern) => pattern.test(path))) {
       console.log(`SKIP REVIEW: ${path}`);
@@ -122,7 +123,7 @@ const main = async () => {
   await promiseAllWithConcurrencyLimit(promises, 1);
 
   if (!commented) {
-    postComment("Great! No problem found by AI Craftsman.");
+    postComment("Great! No problem found by AI Review Flex.");
   }
 };
 
