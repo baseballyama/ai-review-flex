@@ -49,13 +49,18 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
     const { pullNumber } = await getPullNumberAndCommitId();
-    const { data } = await octokit.rest.pulls.listReviewComments({
+    const { data: reviews } = await octokit.rest.pulls.listReviewComments({
       owner,
       repo,
       pull_number: pullNumber,
     });
+    const { data: comments } = await octokit.rest.issues.listComments({
+      owner,
+      repo,
+      issue_number: pullNumber,
+    });
 
-    return data.sort((a, b) => {
+    return [...reviews, ...comments].sort((a, b) => {
       const aCreatedAt = new Date(a.created_at).getTime();
       const bCreatedAt = new Date(b.created_at).getTime();
       return bCreatedAt - aCreatedAt;
@@ -69,7 +74,7 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
 export const hasCommentByTheApp = async (): Promise<boolean> => {
   const comments = await getCommentsOrderByCreatedAtDesc();
   console.log(comments);
-  return comments.some((c) => c.body.includes(`<!-- COMMIT_ID: `));
+  return comments.some((c) => c.body?.includes(`<!-- COMMIT_ID: `));
 };
 
 const appendCommitId = (body: string, commitId: string) => {
@@ -78,8 +83,8 @@ const appendCommitId = (body: string, commitId: string) => {
 
 export const getLatestCommitIdByTheApp = async (): Promise<string> => {
   const comments = await getCommentsOrderByCreatedAtDesc();
-  const comment = comments.find((c) => c.body.includes(`<!-- COMMIT_ID: `));
-  return comment?.body.match(/<!-- COMMIT_ID:\s*(.+)\s*-->/)?.[1] ?? "";
+  const comment = comments.find((c) => c.body?.includes(`<!-- COMMIT_ID: `));
+  return comment?.body?.match(/<!-- COMMIT_ID:\s*(.+)\s*-->/)?.[1] ?? "";
 };
 
 export const postComment = async (body: string) => {
