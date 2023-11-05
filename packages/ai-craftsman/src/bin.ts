@@ -122,7 +122,7 @@ const main = async () => {
   await promiseAllWithConcurrencyLimit(promises, 1);
 
   if (!commented) {
-    postComment("Great! No problem found by AI Craftsman.");
+    postComment("Great! No problem found by AI Review Flex.");
   }
 };
 
