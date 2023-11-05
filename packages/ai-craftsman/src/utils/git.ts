@@ -68,7 +68,12 @@ export const getCommentsOrderByCreatedAtDesc = async () => {
 
 export const hasCommentByTheApp = async (): Promise<boolean> => {
   const comments = await getCommentsOrderByCreatedAtDesc();
+  console.log(comments);
   return comments.some((c) => c.body.includes(`<!-- COMMIT_ID: `));
+};
+
+const appendCommitId = (body: string, commitId: string) => {
+  return `${body}\n\n` + `<!-- COMMIT_ID: ${commitId} -->`;
 };
 
 export const getLatestCommitIdByTheApp = async (): Promise<string> => {
@@ -86,7 +91,7 @@ export const postComment = async (body: string) => {
       owner,
       repo,
       issue_number: pullNumber,
-      body: body + "\n\n" + `<!-- COMMIT_ID: ${commitId} -->`,
+      body: appendCommitId(body, commitId),
     });
   } catch (error) {
     console.error(error);
@@ -112,7 +117,7 @@ export const postReviewComment = async (
       start_line: startLine,
       line: endLine,
       side: "RIGHT",
-      body: body + "\n\n" + `<!-- COMMIT_ID: ${commitId} -->`,
+      body: appendCommitId(body, commitId),
     });
   } catch (error) {
     console.error(error);
