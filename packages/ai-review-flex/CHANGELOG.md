@@ -1,5 +1,11 @@
 # AI Review Flex
 
+## 0.2.1
+
+### Patch Changes
+
+- b0435af: [fix] Register node_modules for GitHub Action
+
 ## 0.2.0
 
 ### Minor Changes
