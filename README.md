@@ -17,10 +17,8 @@ Incorporate this action in your workflow (`.github/workflows/main.yml`) with the
 - name: AI Review Flex
   uses: baseballyama/ai-review-flex@main
   with:
-    BASE_REF: ${{ github.base_ref }}
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    GITHUB_EVENT_PATH: ${{ github.event_path }}
     LANGUAGE: "English"
     CODING_GUIDE_PATH: "path/to/guide.md"
     CODING_GUIDE_LEVEL: 2

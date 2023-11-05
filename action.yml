@@ -1,17 +1,11 @@
 name: "AI Craftsman"
 description: "Fully customizable AI reviewer"
 inputs:
-  BASE_REF:
-    description: "Value of github.base_ref"
-    required: true
   OPENAI_API_KEY:
     description: "OpenAI API Key"
     required: true
   GITHUB_TOKEN:
     description: "Value of secrets.GITHUB_TOKEN"
-    required: true
-  GITHUB_EVENT_PATH:
-    description: "Value of github.event_path"
     required: true
   LANGUAGE:
     description: "Your preferred language. Example: English"

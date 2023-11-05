@@ -38,10 +38,8 @@ jobs:
       - name: AI Review
         run: node packages/ai-craftsman/dist/bin.js
         env:
-          # BASE_REF: ${{ github.base_ref }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GITHUB_EVENT_PATH: ${{ github.event_path }}
           LANGUAGE: Japanese
           CODING_GUIDE_PATH: ExampleOfCodigRules.md
           # CODING_GUIDE_READER: packages/ai-craftsman/dist/ci/codingGuide.js
