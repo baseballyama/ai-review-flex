@@ -35,8 +35,8 @@ jobs:
         uses: changesets/action@v1
         with:
           version: pnpm update:version
-          commit: "chore: release ai-reivew-flex"
-          title: "chore: release ai-reivew-flex"
+          commit: "chore: release ai-review-flex"
+          title: "chore: release ai-review-flex"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -64,7 +64,7 @@ jobs:
           fallback: 0.0.0
 
       - name: Get version from package.json
-        run: echo "PACKAGE_VERSION=$(jq -r '.version' packages/ai-reivew-flex/package.json)" >> $GITHUB_ENV
+        run: echo "PACKAGE_VERSION=$(jq -r '.version' packages/ai-review-flex/package.json)" >> $GITHUB_ENV
 
       - name: Check if PACKAGE_VERSION matches the latest tag
         run: |
@@ -85,7 +85,7 @@ jobs:
 
       - name: Build
         if: env.SHOULD_SKIP == 'false'
-        run: cd packages/ai-reivew-flex && pnpm build
+        run: cd packages/ai-review-flex && pnpm build
 
       - name: Zip output
         if: env.SHOULD_SKIP == 'false'
@@ -96,7 +96,7 @@ jobs:
         with:
           tag: v${{ env.PACKAGE_VERSION }}
           name: v${{ env.PACKAGE_VERSION }}
-          body: "Please see the [CHANGELOG](./packages/ai-reivew-flex/CHANGELOG.md) for details."
+          body: "Please see the [CHANGELOG](./packages/ai-review-flex/CHANGELOG.md) for details."
           artifacts: "release.zip"
           skipIfReleaseExists: true
 
@@ -113,7 +113,7 @@ jobs:
         with:
           tag: ${{ env.MAJOR_VERSION }}
           name: ${{ env.MAJOR_VERSION }}
-          body: "Please see the [CHANGELOG](./packages/ai-reivew-flex/CHANGELOG.md) for details."
+          body: "Please see the [CHANGELOG](./packages/ai-review-flex/CHANGELOG.md) for details."
           artifacts: "release.zip"
           allowUpdates: true
           prerelease: ${{ env.IS_V0 }}

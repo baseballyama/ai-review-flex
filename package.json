@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "cd packages/ai-reivew-flex && pnpm build",
+    "build": "cd packages/ai-review-flex && pnpm build",
     "update:version": "changeset version"
   },
   "keywords": [],

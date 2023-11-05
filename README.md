@@ -34,7 +34,7 @@ Incorporate this action in your workflow (`.github/workflows/main.yml`) with the
 
 ```yaml
 - name: AI Review Flex
-  uses: baseballyama/ai-review-flex@main
+  uses: baseballyama/ai-review-flex@v0
   with:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

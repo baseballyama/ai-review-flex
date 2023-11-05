@@ -28,7 +28,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: cd packages/ai-reivew-flex && pnpm build
+        run: cd packages/ai-review-flex && pnpm build
 
       - name: Test
-        run: cd packages/ai-reivew-flex && pnpm test:all
+        run: cd packages/ai-review-flex && pnpm test:all
