@@ -23,16 +23,6 @@ const required = <T>(key: string, value: T | undefined): T => {
 };
 
 export const env = {
-  github: {
-    token: getEnv("GITHUB_TOKEN", { required: true }),
-    repository: required(
-      "GITHUB_REPOSITORY",
-      github.context.payload?.repository
-    ),
-    eventPath: getEnv("GITHUB_EVENT_PATH", { required: true }),
-    comment:
-      String(github.context?.payload?.comment?.["body"] ?? "") || undefined,
-  },
   openaiApiKey: getEnv("OPENAI_API_KEY", { required: true }),
   language: getEnv("LANGUAGE", { defaultValue: "English", required: true }),
   debug: getEnv("DEBUG")?.toLowerCase() === "true",

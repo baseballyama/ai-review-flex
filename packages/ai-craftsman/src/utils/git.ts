@@ -2,24 +2,25 @@ import github from "@actions/github";
 import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
-import { env } from "../config.js";
+
+const githubToken = process.env["GITHUB_TOKEN"] ?? "";
 
 const getOctokit = () => {
-  return new Octokit({ auth: env.github.token });
+  return new Octokit({ auth: githubToken });
 };
 
+export const eventPath = process.env["GITHUB_EVENT_PATH"] ?? "";
+export const repository = github.context.payload?.repository;
+export const comment = github.context?.payload?.comment?.["body"] || undefined;
+
 const getOwnerAndRepo = () => {
-  const owner = env.github.repository?.owner?.login ?? "";
-  const repo = env.github.repository?.name ?? "";
-  return { owner, repo };
+  const { owner, name } = repository ?? {};
+  return { owner: owner?.login ?? "", repo: name ?? "" };
 };
 
 const getPullNumberAndCommitId = async () => {
-  const githubEventPath = env.github.eventPath ?? "";
-  const githubEvent = JSON.parse(
-    await fs.promises.readFile(githubEventPath, "utf8")
-  );
-  const pullNumber = githubEvent.pull_request.number ?? "";
+  const githubEvent = JSON.parse(await fs.promises.readFile(eventPath, "utf8"));
+  const pullNumber = github.context.payload.issue?.["pull_request"]?.number;
   const commitId = githubEvent.pull_request.head.sha ?? "";
   return { pullNumber, commitId };
 };

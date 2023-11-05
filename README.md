@@ -121,5 +121,3 @@ Suggestions and contributions are appreciated! Feel free to submit issues or pul
 ## License
 
 Distributed under the MIT License.
-
-## Test
