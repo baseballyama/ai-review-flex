@@ -1,5 +1,3 @@
-import github from "@actions/github";
-
 const getEnv = (
   key: string,
   option: {
@@ -14,11 +12,6 @@ const getEnv = (
   if (option.required === true && !value) {
     throw new Error(`Please set ${key} environment variable.`);
   }
-  return value;
-};
-
-const required = <T>(key: string, value: T | undefined): T => {
-  if (!value) throw new Error(`${key} should be set.`);
   return value;
 };
 
