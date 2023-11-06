@@ -45,6 +45,9 @@ importers:
       '@types/node':
         specifier: 20.8.10
         version: 20.8.10
+      '@vercel/ncc':
+        specifier: 0.38.1
+        version: 0.38.1
 
 packages:
 
@@ -719,6 +722,11 @@ packages:
 
   /@types/semver@7.5.4:
     resolution: {integrity: sha512-MMzuxN3GdFwskAnb6fz0orFvhfqi752yjaXylr0Rp4oDg5H0Zn1IuyRhDVvYOwAXoJirx2xuS16I3WjxnAIHiQ==}
+    dev: true
+
+  /@vercel/ncc@0.38.1:
+    resolution: {integrity: sha512-IBBb+iI2NLu4VQn3Vwldyi2QwaXt5+hTyh58ggAMoCGE6DJmPvwL3KPBWcJl1m9LYPChBLE980Jw+CS4Wokqxw==}
+    hasBin: true
     dev: true
 
   /@vitest/expect@0.34.6:
