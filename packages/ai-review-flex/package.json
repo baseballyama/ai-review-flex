@@ -3,10 +3,9 @@
   "version": "0.2.1",
   "description": "AI based Code reviewer following your project rules",
   "main": "./dist/index.js",
-  "type": "module",
   "scripts": {
     "dev": "tsc -w",
-    "build": "ncc build ./src/bin.ts --out dist --license ../../LICENSE",
+    "build": "rm -rf dist && ncc build ./src/bin.ts --out dist --license ../../LICENSE",
     "type:check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
