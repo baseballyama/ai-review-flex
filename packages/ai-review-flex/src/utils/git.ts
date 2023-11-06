@@ -1,15 +1,18 @@
 import * as github from "@actions/github";
+import * as core from "@actions/core";
 import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
 
-const githubToken = process.env["GITHUB_TOKEN"] ?? "";
+const githubToken =
+  process.env["GITHUB_TOKEN"] || core.getInput("GITHUB_TOKEN") || "";
 
 const getOctokit = () => {
   return new Octokit({ auth: githubToken });
 };
 
-export const eventPath = process.env["GITHUB_EVENT_PATH"] ?? "";
+export const eventPath =
+  process.env["GITHUB_EVENT_PATH"] || core.getInput("GITHUB_EVENT_PATH") || "";
 export const repository = github.context.payload?.repository;
 export const commentId = github.context?.payload?.comment?.["id"] ?? undefined;
 export const comment = github.context?.payload?.comment?.["body"] || undefined;
