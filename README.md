@@ -33,6 +33,10 @@ To use `AI Review Flex`, make sure you have:
 Incorporate this action in your workflow (`.github/workflows/main.yml`) with the required settings:
 
 ```yaml
+- uses: actions/checkout@v4
+  with:
+    # Needed to get diffs
+    fetch-depth: 0
 - name: AI Review Flex
   uses: baseballyama/ai-review-flex@v0
   with:
