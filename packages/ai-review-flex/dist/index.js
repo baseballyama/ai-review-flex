@@ -38635,12 +38635,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getDiff = exports.getRef = exports.postReviewComment = exports.postComment = exports.reactToComment = exports.getLatestCommitIdByTheApp = exports.hasCommentByTheApp = exports.getCommentsOrderByCreatedAtDesc = exports.isPrDraft = exports.getCommitId = exports.comment = exports.commentId = exports.repository = exports.eventPath = void 0;
-const github_1 = __importDefault(__nccwpck_require__(7131));
+const github = __importStar(__nccwpck_require__(7131));
 const fs = __importStar(__nccwpck_require__(7561));
 const node_child_process_1 = __nccwpck_require__(7718);
 const rest_1 = __nccwpck_require__(4048);
@@ -38649,18 +38646,18 @@ const getOctokit = () => {
     return new rest_1.Octokit({ auth: githubToken });
 };
 exports.eventPath = process.env["GITHUB_EVENT_PATH"] ?? "";
-exports.repository = github_1.default.context.payload?.repository;
-exports.commentId = github_1.default.context?.payload?.comment?.["id"] ?? undefined;
-exports.comment = github_1.default.context?.payload?.comment?.["body"] || undefined;
+exports.repository = github.context.payload?.repository;
+exports.commentId = github.context?.payload?.comment?.["id"] ?? undefined;
+exports.comment = github.context?.payload?.comment?.["body"] || undefined;
 const getOwnerAndRepo = () => {
     const { owner, name } = exports.repository ?? {};
     return { owner: owner?.login ?? "", repo: name ?? "" };
 };
 const getPullNumber = () => {
-    let number = github_1.default.context.payload.pull_request?.number;
+    let number = github.context.payload.pull_request?.number;
     if (number)
         return number;
-    number = github_1.default.context.issue?.number;
+    number = github.context.issue?.number;
     if (number)
         return number;
     throw new Error("Cannot get pull request number.");
@@ -38790,8 +38787,8 @@ const postReviewComment = async (path, startLine, endLine, body) => {
 };
 exports.postReviewComment = postReviewComment;
 const getRef = async () => {
-    const base = github_1.default.context.payload.pull_request?.["base"]?.sha;
-    const head = github_1.default.context.payload.pull_request?.["head"]?.sha;
+    const base = github.context.payload.pull_request?.["base"]?.sha;
+    const head = github.context.payload.pull_request?.["head"]?.sha;
     if (base && head)
         return { base, head };
     const { owner, repo } = getOwnerAndRepo();

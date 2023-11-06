@@ -1,4 +1,4 @@
-import github from "@actions/github";
+import * as github from "@actions/github";
 import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
