@@ -1,5 +1,11 @@
 # AI Review Flex
 
+## 0.2.4
+
+### Patch Changes
+
+- 214e712: [fix] Fix to get GITHUB_TOKEN
+
 ## 0.2.3
 
 ### Patch Changes
