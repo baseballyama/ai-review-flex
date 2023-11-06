@@ -1,5 +1,11 @@
 # AI Review Flex
 
+## 0.2.3
+
+### Patch Changes
+
+- 1c90fda: [fix] Fix to get environment variables
+
 ## 0.2.2
 
 ### Patch Changes
