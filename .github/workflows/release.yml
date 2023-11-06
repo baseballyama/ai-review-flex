@@ -79,25 +79,12 @@ jobs:
           PACKAGE_VERSION: v${{ env.PACKAGE_VERSION }}
           LATEST_TAG: ${{ steps.getLatestTag.outputs.tag }}
 
-      - name: Install dependencies
-        if: env.SHOULD_SKIP == 'false'
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        if: env.SHOULD_SKIP == 'false'
-        run: cd packages/ai-review-flex && pnpm build
-
-      - name: Zip output
-        if: env.SHOULD_SKIP == 'false'
-        run: zip -r release ./
-
       - uses: ncipollo/release-action@v1
         if: env.SHOULD_SKIP == 'false'
         with:
           tag: v${{ env.PACKAGE_VERSION }}
           name: v${{ env.PACKAGE_VERSION }}
           body: "Please see the [CHANGELOG](./packages/ai-review-flex/CHANGELOG.md) for details."
-          artifacts: "release.zip"
           skipIfReleaseExists: true
 
       - name: Extract major version
@@ -114,6 +101,5 @@ jobs:
           tag: ${{ env.MAJOR_VERSION }}
           name: ${{ env.MAJOR_VERSION }}
           body: "Please see the [CHANGELOG](./packages/ai-review-flex/CHANGELOG.md) for details."
-          artifacts: "release.zip"
           allowUpdates: true
           prerelease: ${{ env.IS_V0 }}

@@ -36,4 +36,4 @@ inputs:
     required: false
 runs:
   using: "node20"
-  main: "packages/ai-review-flex/dist/bin.js"
+  main: "packages/ai-review-flex/dist/index.js"

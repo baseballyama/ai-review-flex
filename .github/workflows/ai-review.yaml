@@ -36,7 +36,7 @@ jobs:
         run: cd packages/ai-review-flex && pnpm build
 
       - name: AI Review
-        run: node packages/ai-review-flex/dist/bin.js
+        run: node packages/ai-review-flex/dist/index.js
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
