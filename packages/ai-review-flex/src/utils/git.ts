@@ -1,18 +1,15 @@
 import * as github from "@actions/github";
-import * as core from "@actions/core";
 import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
 
-const githubToken =
-  process.env["GITHUB_TOKEN"] || core.getInput("GITHUB_TOKEN") || "";
+const githubToken = process.env["GITHUB_TOKEN"] ?? "";
 
 const getOctokit = () => {
   return new Octokit({ auth: githubToken });
 };
 
-export const eventPath =
-  process.env["GITHUB_EVENT_PATH"] || core.getInput("GITHUB_EVENT_PATH") || "";
+export const eventPath = process.env["GITHUB_EVENT_PATH"] ?? "";
 export const repository = github.context.payload?.repository;
 export const commentId = github.context?.payload?.comment?.["id"] ?? undefined;
 export const comment = github.context?.payload?.comment?.["body"] || undefined;
@@ -151,17 +148,21 @@ export const postReviewComment = async (
     const octokit = getOctokit();
     const { owner, repo } = getOwnerAndRepo();
     const commitId = await getCommitId();
-    await octokit.rest.pulls.createReviewComment({
-      owner,
-      repo,
-      pull_number: getPullNumber(),
-      commit_id: commitId,
-      path,
-      start_line: startLine,
-      line: endLine,
-      side: "RIGHT",
-      body: appendCommitId(body, commitId),
-    });
+    const params: Parameters<typeof octokit.rest.pulls.createReviewComment>[0] =
+      {
+        owner,
+        repo,
+        pull_number: getPullNumber(),
+        commit_id: commitId,
+        path,
+        line: endLine,
+        side: "RIGHT",
+        body: appendCommitId(body, commitId),
+      };
+    if (startLine !== endLine) {
+      params["start_line"] = startLine;
+    }
+    await octokit.rest.pulls.createReviewComment(params);
   } catch (error) {
     console.error(error);
   }

@@ -40389,15 +40389,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getDiff = exports.getRef = exports.postReviewComment = exports.postComment = exports.reactToComment = exports.getLatestCommitIdByTheApp = exports.hasCommentByTheApp = exports.getCommentsOrderByCreatedAtDesc = exports.isPrDraft = exports.getCommitId = exports.comment = exports.commentId = exports.repository = exports.eventPath = void 0;
 const github = __importStar(__nccwpck_require__(7131));
-const core = __importStar(__nccwpck_require__(4237));
 const fs = __importStar(__nccwpck_require__(7561));
 const node_child_process_1 = __nccwpck_require__(7718);
 const rest_1 = __nccwpck_require__(4048);
-const githubToken = process.env["GITHUB_TOKEN"] || core.getInput("GITHUB_TOKEN") || "";
+const githubToken = process.env["GITHUB_TOKEN"] ?? "";
 const getOctokit = () => {
     return new rest_1.Octokit({ auth: githubToken });
 };
-exports.eventPath = process.env["GITHUB_EVENT_PATH"] || core.getInput("GITHUB_EVENT_PATH") || "";
+exports.eventPath = process.env["GITHUB_EVENT_PATH"] ?? "";
 exports.repository = github.context.payload?.repository;
 exports.commentId = github.context?.payload?.comment?.["id"] ?? undefined;
 exports.comment = github.context?.payload?.comment?.["body"] || undefined;
@@ -40521,17 +40520,20 @@ const postReviewComment = async (path, startLine, endLine, body) => {
         const octokit = getOctokit();
         const { owner, repo } = getOwnerAndRepo();
         const commitId = await (0, exports.getCommitId)();
-        await octokit.rest.pulls.createReviewComment({
+        const params = {
             owner,
             repo,
             pull_number: getPullNumber(),
             commit_id: commitId,
             path,
-            start_line: startLine,
             line: endLine,
             side: "RIGHT",
             body: appendCommitId(body, commitId),
-        });
+        };
+        if (startLine !== endLine) {
+            params["start_line"] = startLine;
+        }
+        await octokit.rest.pulls.createReviewComment(params);
     }
     catch (error) {
         console.error(error);
