@@ -1,5 +1,11 @@
 # AI Review Flex
 
+## 0.2.5
+
+### Patch Changes
+
+- cd927c6: [fix] Fix to send a comment for 1 line
+
 ## 0.2.4
 
 ### Patch Changes
