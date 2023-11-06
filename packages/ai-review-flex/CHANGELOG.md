@@ -1,5 +1,11 @@
 # AI Review Flex
 
+## 0.2.1
+
+### Patch Changes
+
+- cf2b3d1: [fix] Fix to execute AI Review Flex on GitHub Actions
+
 ## 0.2.0
 
 ### Minor Changes
