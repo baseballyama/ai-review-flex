@@ -1,5 +1,11 @@
 # AI Review Flex
 
+## 0.2.2
+
+### Patch Changes
+
+- a8d6304: [fix] Fix action.yml
+
 ## 0.2.1
 
 ### Patch Changes
