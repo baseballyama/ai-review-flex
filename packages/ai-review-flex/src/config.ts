@@ -1,3 +1,5 @@
+import * as core from "@actions/core";
+
 const getEnv = (
   key: string,
   option: {
@@ -5,7 +7,7 @@ const getEnv = (
     required?: boolean;
   } = {}
 ): string => {
-  const value = String(process.env[key] ?? "");
+  const value = String(process.env[key] || core.getInput(key) || "");
   if (!value && option.defaultValue) {
     return option.defaultValue;
   }
