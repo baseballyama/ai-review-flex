@@ -81,6 +81,8 @@ const main = async () => {
       console.log(`SKIP REVIEW: ${path}`);
       continue;
     }
+
+    const file = fs.readFileSync(path, "utf-8");
     for (const df of splitForEachDiff(diff)) {
       if (df.type === "delete") continue;
       for (const rule of rules) {
@@ -100,6 +102,7 @@ const main = async () => {
           const reviewComments = await review(
             rule.rule,
             path,
+            file,
             df.diff,
             env.language
           );
@@ -120,7 +123,10 @@ const main = async () => {
     }
   }
 
-  await promiseAllWithConcurrencyLimit(promises, 1);
+  await promiseAllWithConcurrencyLimit(promises, 5, {
+    retryCount: 3,
+    continueOnError: true,
+  });
   if (commentedCount === 0) {
     git.postComment("Great! No problem found by AI Review Flex.");
   }
