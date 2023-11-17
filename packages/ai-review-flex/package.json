@@ -1,6 +1,6 @@
 {
   "name": "ai-review-flex",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "AI based Code reviewer following your project rules",
   "main": "./dist/index.js",
   "scripts": {
