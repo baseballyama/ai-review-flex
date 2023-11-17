@@ -1,8 +1,15 @@
 export const promiseAllWithConcurrencyLimit = <T>(
   tasks: (() => Promise<T>)[],
   limit: number,
-  continueOnError = true
+  option: {
+    retryCount: number;
+    continueOnError: boolean;
+  } = {
+    retryCount: 1,
+    continueOnError: false,
+  }
 ): Promise<T[]> => {
+  option.retryCount = Math.max(1, option.retryCount);
   return new Promise<T[]>(async (resolve, reject) => {
     let active = 0;
     let result: T[] = [];
@@ -16,9 +23,19 @@ export const promiseAllWithConcurrencyLimit = <T>(
       const task = tasks[currentIndex++]!;
       active++;
       try {
-        result[index] = await task();
+        for (const i of Array(option.retryCount).keys()) {
+          try {
+            result[index] = await task();
+            await new Promise((resolve) => setTimeout(resolve, 1000 * 10));
+            break;
+          } catch (e) {
+            if (i === option.retryCount - 1) {
+              throw e;
+            }
+          }
+        }
       } catch (e) {
-        if (!continueOnError) {
+        if (!option.continueOnError) {
           return reject(e);
         } else {
           console.error(e);

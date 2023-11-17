@@ -4,10 +4,11 @@ import { chat } from "../utils/openai.js";
 // Request
 // ----------------------------------------------------------------------
 
-const buildPrompt = (codingRule: string, language: string) => {
+const buildPrompt = (codingRule: string, file: string, language: string) => {
   return `\
 You are the world's best programmer. Your task is to review code by looking at GitHub diffs.
-Please review the following diffs to see if they follow the coding guide below.
+First, carefully familiarize yourself with the entire file you are reviewing.
+Next, please review the following diffs to see if they follow the coding guide below.
 If they follow the coding guide, just reply "OK".
 If not, please comment how to improve it.
 Note that each line of the diff is prefixed with a line number.
@@ -28,7 +29,14 @@ lines: {{Start line number for the comment}},{{End line for the comment}}
 
 ## Review Comment
 lines: {{Start line number for the comment}},{{End line number for the comment}}
-{{Please write the review comment here in ${language}}}`;
+{{Please write the review comment here in ${language}}}
+
+---
+
+Here is the entire file you are reviewing.
+
+${file}
+`;
 };
 
 // ----------------------------------------------------------------------
@@ -116,12 +124,13 @@ const parseResponse = (
 export const review = async (
   codingRule: string,
   filePath: string,
+  file: string,
   diff: string,
   language: string
 ): Promise<ReviewComment[]> => {
   const response = await chat([
     {
-      content: buildPrompt(codingRule, language),
+      content: buildPrompt(codingRule, file, language),
       role: "system",
     },
     {
