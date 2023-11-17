@@ -40033,6 +40033,7 @@ const main = async () => {
             console.log(`SKIP REVIEW: ${path}`);
             continue;
         }
+        const file = fs.readFileSync(path, "utf-8");
         for (const df of (0, diff_js_1.splitForEachDiff)(diff)) {
             if (df.type === "delete")
                 continue;
@@ -40050,7 +40051,7 @@ const main = async () => {
                             diff: df.diff,
                         });
                     }
-                    const reviewComments = await (0, review_js_1.review)(rule.rule, path, df.diff, config_js_1.env.language);
+                    const reviewComments = await (0, review_js_1.review)(rule.rule, path, file, df.diff, config_js_1.env.language);
                     for (const comment of reviewComments) {
                         if (config_js_1.env.debug) {
                             console.debug(`Receive REVIEW (${randomId})`, comment);
@@ -40062,7 +40063,10 @@ const main = async () => {
             }
         }
     }
-    await (0, concurrent_js_1.promiseAllWithConcurrencyLimit)(promises, 1);
+    await (0, concurrent_js_1.promiseAllWithConcurrencyLimit)(promises, 5, {
+        retryCount: 3,
+        continueOnError: true,
+    });
     if (commentedCount === 0) {
         git.postComment("Great! No problem found by AI Review Flex.");
     }
@@ -40142,10 +40146,11 @@ const openai_js_1 = __nccwpck_require__(7249);
 // ----------------------------------------------------------------------
 // Request
 // ----------------------------------------------------------------------
-const buildPrompt = (codingRule, language) => {
+const buildPrompt = (codingRule, file, language) => {
     return `\
 You are the world's best programmer. Your task is to review code by looking at GitHub diffs.
-Please review the following diffs to see if they follow the coding guide below.
+First, carefully familiarize yourself with the entire file you are reviewing.
+Next, please review the following diffs to see if they follow the coding guide below.
 If they follow the coding guide, just reply "OK".
 If not, please comment how to improve it.
 Note that each line of the diff is prefixed with a line number.
@@ -40166,7 +40171,14 @@ lines: {{Start line number for the comment}},{{End line for the comment}}
 
 ## Review Comment
 lines: {{Start line number for the comment}},{{End line number for the comment}}
-{{Please write the review comment here in ${language}}}`;
+{{Please write the review comment here in ${language}}}
+
+---
+
+Here is the entire file you are reviewing.
+
+${file}
+`;
 };
 const appendCodingRule = (body, codingRule) => {
     const [name, ...rest] = codingRule.split("\n");
@@ -40231,10 +40243,10 @@ const parseResponse = (response, codingRule) => {
 // ----------------------------------------------------------------------
 // Main
 // ----------------------------------------------------------------------
-const review = async (codingRule, filePath, diff, language) => {
+const review = async (codingRule, filePath, file, diff, language) => {
     const response = await (0, openai_js_1.chat)([
         {
-            content: buildPrompt(codingRule, language),
+            content: buildPrompt(codingRule, file, language),
             role: "system",
         },
         {
@@ -40256,7 +40268,11 @@ exports.review = review;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.promiseAllWithConcurrencyLimit = void 0;
-const promiseAllWithConcurrencyLimit = (tasks, limit, continueOnError = true) => {
+const promiseAllWithConcurrencyLimit = (tasks, limit, option = {
+    retryCount: 1,
+    continueOnError: false,
+}) => {
+    option.retryCount = Math.max(1, option.retryCount);
     return new Promise(async (resolve, reject) => {
         let active = 0;
         let result = [];
@@ -40269,10 +40285,21 @@ const promiseAllWithConcurrencyLimit = (tasks, limit, continueOnError = true) =>
             const task = tasks[currentIndex++];
             active++;
             try {
-                result[index] = await task();
+                for (const i of Array(option.retryCount).keys()) {
+                    try {
+                        result[index] = await task();
+                        await new Promise((resolve) => setTimeout(resolve, 1000 * 10));
+                        break;
+                    }
+                    catch (e) {
+                        if (i === option.retryCount - 1) {
+                            throw e;
+                        }
+                    }
+                }
             }
             catch (e) {
-                if (!continueOnError) {
+                if (!option.continueOnError) {
                     return reject(e);
                 }
                 else {
@@ -40677,7 +40704,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.chat = exports.getTokenCount = void 0;
 const tiktoken_node_1 = __importDefault(__nccwpck_require__(1601));
-const openai_1 = __importDefault(__nccwpck_require__(3525));
+const openai_1 = __importDefault(__nccwpck_require__(2328));
 const config_js_1 = __nccwpck_require__(992);
 const openai = new openai_1.default({
     apiKey: config_js_1.env.openaiApiKey,
@@ -40689,10 +40716,25 @@ const getTokenCount = (text) => {
 exports.getTokenCount = getTokenCount;
 const chat = async (messages) => {
     const tokenCount = messages.reduce((acc, message) => {
-        return acc + (0, exports.getTokenCount)(message.content ?? "");
+        const { content } = message;
+        if (content == null)
+            return acc;
+        if (typeof content === "string") {
+            return acc + (0, exports.getTokenCount)(content);
+        }
+        else {
+            const tokenCounts = content.reduce((init, c) => {
+                if (c.type === "text") {
+                    return init + (0, exports.getTokenCount)(c.text);
+                }
+                else {
+                    return init;
+                }
+            }, 0);
+            return acc + tokenCounts;
+        }
     }, 0);
-    const model = tokenCount * 1.1 + 1024 < 8 * 1024 ? "gpt-4" : "gpt-4-32k";
-    const body = { model, messages, temperature: 0 };
+    const body = { model: "gpt-4-1106-preview", messages, temperature: 0 };
     const response = await openai.chat.completions.create(body, {
         maxRetries: 2,
         timeout: Math.trunc(Math.max(90 * 1000, Math.min(1000 * 20, tokenCount / 10))),
@@ -41984,7 +42026,7 @@ exports["default"] = isPlainObject;
 
 /***/ }),
 
-/***/ 6959:
+/***/ 1916:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -42007,7 +42049,7 @@ exports.MultipartBody = MultipartBody;
 
 /***/ }),
 
-/***/ 2262:
+/***/ 842:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -42030,19 +42072,19 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
-__exportStar(__nccwpck_require__(5783), exports);
+__exportStar(__nccwpck_require__(1095), exports);
 //# sourceMappingURL=runtime-node.js.map
 
 /***/ }),
 
-/***/ 2272:
+/***/ 5168:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
-const shims = __nccwpck_require__(9019);
-const auto = __nccwpck_require__(2262);
+const shims = __nccwpck_require__(1274);
+const auto = __nccwpck_require__(842);
 if (!shims.kind) shims.setShims(auto.getRuntime(), { auto: true });
 for (const property of Object.keys(shims)) {
   Object.defineProperty(exports, property, {
@@ -42055,7 +42097,7 @@ for (const property of Object.keys(shims)) {
 
 /***/ }),
 
-/***/ 5783:
+/***/ 1095:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -42098,7 +42140,7 @@ const abort_controller_1 = __nccwpck_require__(629);
 const node_fs_1 = __nccwpck_require__(7561);
 const form_data_encoder_1 = __nccwpck_require__(6828);
 const node_stream_1 = __nccwpck_require__(4492);
-const MultipartBody_1 = __nccwpck_require__(6959);
+const MultipartBody_1 = __nccwpck_require__(1916);
 // @ts-ignore (this package does not have proper export maps for this export)
 const ponyfill_es2018_js_1 = __nccwpck_require__(631);
 let fileFromPathWarned = false;
@@ -42152,7 +42194,7 @@ exports.getRuntime = getRuntime;
 
 /***/ }),
 
-/***/ 9019:
+/***/ 1274:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -42200,7 +42242,7 @@ exports.setShims = setShims;
 
 /***/ }),
 
-/***/ 9703:
+/***/ 4739:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -42218,13 +42260,13 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 };
 var _AbstractPage_client;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.toBase64 = exports.getRequiredHeader = exports.isHeadersProtocol = exports.isRunningInBrowser = exports.debug = exports.hasOwn = exports.isEmptyObj = exports.maybeCoerceBoolean = exports.maybeCoerceFloat = exports.maybeCoerceInteger = exports.coerceBoolean = exports.coerceFloat = exports.coerceInteger = exports.readEnv = exports.ensurePresent = exports.castToError = exports.sleep = exports.safeJSON = exports.isRequestOptions = exports.createResponseHeaders = exports.PagePromise = exports.AbstractPage = exports.APIResource = exports.APIClient = exports.APIPromise = exports.createForm = exports.multipartFormRequestOptions = exports.maybeMultipartFormRequestOptions = void 0;
-const version_1 = __nccwpck_require__(4322);
-const streaming_1 = __nccwpck_require__(2947);
-const error_1 = __nccwpck_require__(8817);
-const index_1 = __nccwpck_require__(2272);
-const uploads_1 = __nccwpck_require__(4297);
-var uploads_2 = __nccwpck_require__(4297);
+exports.toBase64 = exports.getRequiredHeader = exports.isHeadersProtocol = exports.isRunningInBrowser = exports.debug = exports.hasOwn = exports.isEmptyObj = exports.maybeCoerceBoolean = exports.maybeCoerceFloat = exports.maybeCoerceInteger = exports.coerceBoolean = exports.coerceFloat = exports.coerceInteger = exports.readEnv = exports.ensurePresent = exports.castToError = exports.sleep = exports.safeJSON = exports.isRequestOptions = exports.createResponseHeaders = exports.PagePromise = exports.AbstractPage = exports.APIClient = exports.APIPromise = exports.createForm = exports.multipartFormRequestOptions = exports.maybeMultipartFormRequestOptions = void 0;
+const version_1 = __nccwpck_require__(4348);
+const streaming_1 = __nccwpck_require__(4439);
+const error_1 = __nccwpck_require__(3092);
+const index_1 = __nccwpck_require__(5168);
+const uploads_1 = __nccwpck_require__(9278);
+var uploads_2 = __nccwpck_require__(9278);
 Object.defineProperty(exports, "maybeMultipartFormRequestOptions", ({ enumerable: true, get: function () { return uploads_2.maybeMultipartFormRequestOptions; } }));
 Object.defineProperty(exports, "multipartFormRequestOptions", ({ enumerable: true, get: function () { return uploads_2.multipartFormRequestOptions; } }));
 Object.defineProperty(exports, "createForm", ({ enumerable: true, get: function () { return uploads_2.createForm; } }));
@@ -42606,18 +42648,6 @@ class APIClient {
     }
 }
 exports.APIClient = APIClient;
-class APIResource {
-    constructor(client) {
-        this.client = client;
-        this.get = client.get.bind(client);
-        this.post = client.post.bind(client);
-        this.patch = client.patch.bind(client);
-        this.put = client.put.bind(client);
-        this.delete = client.delete.bind(client);
-        this.getAPIList = client.getAPIList.bind(client);
-    }
-}
-exports.APIResource = APIResource;
 class AbstractPage {
     constructor(client, response, body, options) {
         _AbstractPage_client.set(this, void 0);
@@ -43048,7 +43078,7 @@ exports.toBase64 = toBase64;
 
 /***/ }),
 
-/***/ 8817:
+/***/ 3092:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -43056,7 +43086,7 @@ exports.toBase64 = toBase64;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.InternalServerError = exports.RateLimitError = exports.UnprocessableEntityError = exports.ConflictError = exports.NotFoundError = exports.PermissionDeniedError = exports.AuthenticationError = exports.BadRequestError = exports.APIConnectionTimeoutError = exports.APIConnectionError = exports.APIUserAbortError = exports.APIError = exports.OpenAIError = void 0;
-const core_1 = __nccwpck_require__(9703);
+const core_1 = __nccwpck_require__(4739);
 class OpenAIError extends Error {
 }
 exports.OpenAIError = OpenAIError;
@@ -43201,7 +43231,7 @@ exports.InternalServerError = InternalServerError;
 
 /***/ }),
 
-/***/ 3525:
+/***/ 2328:
 /***/ (function(module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -43233,11 +43263,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.fileFromPath = exports.toFile = exports.UnprocessableEntityError = exports.PermissionDeniedError = exports.InternalServerError = exports.AuthenticationError = exports.BadRequestError = exports.RateLimitError = exports.ConflictError = exports.NotFoundError = exports.APIUserAbortError = exports.APIConnectionTimeoutError = exports.APIConnectionError = exports.APIError = exports.OpenAIError = exports.OpenAI = void 0;
-const Core = __importStar(__nccwpck_require__(9703));
-const Pagination = __importStar(__nccwpck_require__(3682));
-const Errors = __importStar(__nccwpck_require__(8817));
-const Uploads = __importStar(__nccwpck_require__(4297));
-const API = __importStar(__nccwpck_require__(1435));
+const Core = __importStar(__nccwpck_require__(4739));
+const Pagination = __importStar(__nccwpck_require__(1456));
+const Errors = __importStar(__nccwpck_require__(3092));
+const Uploads = __importStar(__nccwpck_require__(9278));
+const API = __importStar(__nccwpck_require__(8591));
 /** API Client for interfacing with the OpenAI API. */
 class OpenAI extends Core.APIClient {
     /**
@@ -43351,7 +43381,7 @@ exports["default"] = OpenAI;
 
 /***/ }),
 
-/***/ 8065:
+/***/ 6731:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -43367,11 +43397,13 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _AbstractChatCompletionRunner_instances, _AbstractChatCompletionRunner_connectedPromise, _AbstractChatCompletionRunner_resolveConnectedPromise, _AbstractChatCompletionRunner_rejectConnectedPromise, _AbstractChatCompletionRunner_endPromise, _AbstractChatCompletionRunner_resolveEndPromise, _AbstractChatCompletionRunner_rejectEndPromise, _AbstractChatCompletionRunner_listeners, _AbstractChatCompletionRunner_ended, _AbstractChatCompletionRunner_errored, _AbstractChatCompletionRunner_aborted, _AbstractChatCompletionRunner_catchingPromiseCreated, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalFunctionCall, _AbstractChatCompletionRunner_getFinalFunctionCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_handleError;
+var _AbstractChatCompletionRunner_instances, _AbstractChatCompletionRunner_connectedPromise, _AbstractChatCompletionRunner_resolveConnectedPromise, _AbstractChatCompletionRunner_rejectConnectedPromise, _AbstractChatCompletionRunner_endPromise, _AbstractChatCompletionRunner_resolveEndPromise, _AbstractChatCompletionRunner_rejectEndPromise, _AbstractChatCompletionRunner_listeners, _AbstractChatCompletionRunner_ended, _AbstractChatCompletionRunner_errored, _AbstractChatCompletionRunner_aborted, _AbstractChatCompletionRunner_catchingPromiseCreated, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionCall, _AbstractChatCompletionRunner_getFinalFunctionCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_handleError, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AbstractChatCompletionRunner = void 0;
-const error_1 = __nccwpck_require__(8817);
-const RunnableFunction_1 = __nccwpck_require__(9936);
+const error_1 = __nccwpck_require__(3092);
+const RunnableFunction_1 = __nccwpck_require__(4488);
+const chatCompletionUtils_1 = __nccwpck_require__(6220);
+const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
 class AbstractChatCompletionRunner {
     constructor() {
         _AbstractChatCompletionRunner_instances.add(this);
@@ -43396,10 +43428,18 @@ class AbstractChatCompletionRunner {
             }
             if (error instanceof error_1.APIUserAbortError) {
                 __classPrivateFieldSet(this, _AbstractChatCompletionRunner_aborted, true, "f");
-                this._emit('abort', error);
+                return this._emit('abort', error);
             }
-            const openAIError = error instanceof error_1.OpenAIError ? error : (new error_1.OpenAIError(error instanceof Error ? error.message : String(error)));
-            this._emit('error', openAIError);
+            if (error instanceof error_1.OpenAIError) {
+                return this._emit('error', error);
+            }
+            if (error instanceof Error) {
+                const openAIError = new error_1.OpenAIError(error.message);
+                // @ts-ignore
+                openAIError.cause = error;
+                return this._emit('error', openAIError);
+            }
+            return this._emit('error', new error_1.OpenAIError(String(error)));
         });
         __classPrivateFieldSet(this, _AbstractChatCompletionRunner_connectedPromise, new Promise((resolve, reject) => {
             __classPrivateFieldSet(this, _AbstractChatCompletionRunner_resolveConnectedPromise, resolve, "f");
@@ -43438,11 +43478,19 @@ class AbstractChatCompletionRunner {
         this.messages.push(message);
         if (emit) {
             this._emit('message', message);
-            if (message.role === 'function' && message.content) {
+            if (((0, chatCompletionUtils_1.isFunctionMessage)(message) || (0, chatCompletionUtils_1.isToolMessage)(message)) && message.content) {
+                // Note, this assumes that {role: 'tool', content: …} is always the result of a call of tool of type=function.
                 this._emit('functionCallResult', message.content);
             }
-            else if (message.function_call) {
+            else if ((0, chatCompletionUtils_1.isAssistantMessage)(message) && message.function_call) {
                 this._emit('functionCall', message.function_call);
+            }
+            else if ((0, chatCompletionUtils_1.isAssistantMessage)(message) && message.tool_calls) {
+                for (const tool_call of message.tool_calls) {
+                    if (tool_call.type === 'function') {
+                        this._emit('functionCall', tool_call.function);
+                    }
+                }
             }
         }
     }
@@ -43545,15 +43593,12 @@ class AbstractChatCompletionRunner {
         return __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_getFinalContent).call(this);
     }
     /**
-     * @returns a promise that resolves with the the final ChatCompletionMessage, or rejects
-     * if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
+     * @returns a promise that resolves with the the final assistant ChatCompletionMessage response,
+     * or rejects if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
      */
     async finalMessage() {
         await this.done();
-        const message = this.messages[this.messages.length - 1];
-        if (!message)
-            throw new error_1.OpenAIError('stream ended without producing a ChatCompletionMessage');
-        return message;
+        return __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_getFinalMessage).call(this);
     }
     /**
      * @returns a promise that resolves with the content of the final FunctionCall, or rejects
@@ -43586,6 +43631,16 @@ class AbstractChatCompletionRunner {
         if (listeners) {
             __classPrivateFieldGet(this, _AbstractChatCompletionRunner_listeners, "f")[event] = listeners.filter((l) => !l.once);
             listeners.forEach(({ listener }) => listener(...args));
+        }
+        if (event === 'abort') {
+            const error = args[0];
+            if (!__classPrivateFieldGet(this, _AbstractChatCompletionRunner_catchingPromiseCreated, "f") && !listeners?.length) {
+                Promise.reject(error);
+            }
+            __classPrivateFieldGet(this, _AbstractChatCompletionRunner_rejectConnectedPromise, "f").call(this, error);
+            __classPrivateFieldGet(this, _AbstractChatCompletionRunner_rejectEndPromise, "f").call(this, error);
+            this._emit('end');
+            return;
         }
         if (event === 'error') {
             // NOTE: _emit('error', error) should only be called from #handleError().
@@ -43631,6 +43686,7 @@ class AbstractChatCompletionRunner {
                 this.controller.abort();
             signal.addEventListener('abort', () => this.controller.abort());
         }
+        __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_validateParams).call(this, params);
         const chatCompletion = await completions.create({ ...params, stream: false }, { ...options, signal: this.controller.signal });
         this._connected();
         return this._addChatCompletion(chatCompletion);
@@ -43642,8 +43698,10 @@ class AbstractChatCompletionRunner {
         return await this._createChatCompletion(completions, params, options);
     }
     async _runFunctions(completions, params, options) {
+        const role = 'function';
         const { function_call = 'auto', stream, ...restParams } = params;
-        const isSingleFunctionCall = typeof function_call !== 'string' && function_call?.name;
+        const singleFunctionToCall = typeof function_call !== 'string' && function_call?.name;
+        const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
         const functionsByName = {};
         for (const f of params.functions) {
             functionsByName[f.name || f.function.name] = f;
@@ -43656,7 +43714,7 @@ class AbstractChatCompletionRunner {
         for (const message of params.messages) {
             this._addMessage(message, false);
         }
-        for (let i = 0; i < (options?.maxChatCompletions ?? 5); ++i) {
+        for (let i = 0; i < maxChatCompletions; ++i) {
             const chatCompletion = await this._createChatCompletion(completions, {
                 ...restParams,
                 function_call,
@@ -43671,16 +43729,16 @@ class AbstractChatCompletionRunner {
                 return;
             const { name, arguments: args } = message.function_call;
             const fn = functionsByName[name];
-            if (!fn || (typeof function_call !== 'string' && name !== function_call?.name)) {
-                this._addMessage({
-                    role: 'function',
-                    name,
-                    content: `Invalid function_call: ${JSON.stringify(name)}. Available options are: ${functions
-                        .map((f) => JSON.stringify(f.name))
-                        .join(', ')}. Please try again`,
-                });
-                if (isSingleFunctionCall)
-                    return;
+            if (!fn) {
+                const content = `Invalid function_call: ${JSON.stringify(name)}. Available options are: ${functions
+                    .map((f) => JSON.stringify(f.name))
+                    .join(', ')}. Please try again`;
+                this._addMessage({ role, name, content });
+                continue;
+            }
+            else if (singleFunctionToCall && singleFunctionToCall !== name) {
+                const content = `Invalid function_call: ${JSON.stringify(name)}. ${JSON.stringify(singleFunctionToCall)} requested. Please try again`;
+                this._addMessage({ role, name, content });
                 continue;
             }
             let parsed;
@@ -43689,42 +43747,124 @@ class AbstractChatCompletionRunner {
             }
             catch (error) {
                 this._addMessage({
-                    role: 'function',
+                    role,
                     name,
                     content: error instanceof Error ? error.message : String(error),
                 });
                 continue;
             }
+            // @ts-expect-error it can't rule out `never` type.
             const rawContent = await fn.function(parsed, this);
-            const content = typeof rawContent === 'string' ? rawContent
-                : rawContent === undefined ? 'undefined'
-                    : JSON.stringify(rawContent);
-            this._addMessage({ role: 'function', name, content });
-            if (isSingleFunctionCall)
+            const content = __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_stringifyFunctionCallResult).call(this, rawContent);
+            this._addMessage({ role, name, content });
+            if (singleFunctionToCall)
                 return;
+        }
+    }
+    async _runTools(completions, params, options) {
+        const role = 'tool';
+        const { tool_choice = 'auto', stream, ...restParams } = params;
+        const singleFunctionToCall = typeof tool_choice !== 'string' && tool_choice?.function?.name;
+        const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS } = options || {};
+        const functionsByName = {};
+        for (const f of params.tools) {
+            if (f.type === 'function') {
+                functionsByName[f.function.name || f.function.function.name] = f.function;
+            }
+        }
+        const tools = 'tools' in params ?
+            params.tools.map((t) => t.type === 'function' ?
+                {
+                    type: 'function',
+                    function: {
+                        name: t.function.name || t.function.function.name,
+                        parameters: t.function.parameters,
+                        description: t.function.description,
+                    },
+                }
+                : t)
+            : undefined;
+        for (const message of params.messages) {
+            this._addMessage(message, false);
+        }
+        for (let i = 0; i < maxChatCompletions; ++i) {
+            const chatCompletion = await this._createChatCompletion(completions, {
+                ...restParams,
+                tool_choice,
+                tools,
+                messages: [...this.messages],
+            }, options);
+            const message = chatCompletion.choices[0]?.message;
+            if (!message) {
+                throw new error_1.OpenAIError(`missing message in ChatCompletion response`);
+            }
+            if (!message.tool_calls)
+                return;
+            for (const tool_call of message.tool_calls) {
+                if (tool_call.type !== 'function')
+                    continue;
+                const tool_call_id = tool_call.id;
+                const { name, arguments: args } = tool_call.function;
+                const fn = functionsByName[name];
+                if (!fn) {
+                    const content = `Invalid tool_call: ${JSON.stringify(name)}. Available options are: ${tools
+                        .map((f) => JSON.stringify(f.function.name))
+                        .join(', ')}. Please try again`;
+                    this._addMessage({ role, tool_call_id, content });
+                    continue;
+                }
+                else if (singleFunctionToCall && singleFunctionToCall !== name) {
+                    const content = `Invalid tool_call: ${JSON.stringify(name)}. ${JSON.stringify(singleFunctionToCall)} requested. Please try again`;
+                    this._addMessage({ role, tool_call_id, content });
+                    continue;
+                }
+                let parsed;
+                try {
+                    parsed = (0, RunnableFunction_1.isRunnableFunctionWithParse)(fn) ? await fn.parse(args) : args;
+                }
+                catch (error) {
+                    const content = error instanceof Error ? error.message : String(error);
+                    this._addMessage({ role, tool_call_id, content });
+                    continue;
+                }
+                // @ts-expect-error it can't rule out `never` type.
+                const rawContent = await fn.function(parsed, this);
+                const content = __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_stringifyFunctionCallResult).call(this, rawContent);
+                this._addMessage({ role, tool_call_id, content });
+                if (singleFunctionToCall)
+                    return;
+            }
         }
     }
 }
 exports.AbstractChatCompletionRunner = AbstractChatCompletionRunner;
 _AbstractChatCompletionRunner_connectedPromise = new WeakMap(), _AbstractChatCompletionRunner_resolveConnectedPromise = new WeakMap(), _AbstractChatCompletionRunner_rejectConnectedPromise = new WeakMap(), _AbstractChatCompletionRunner_endPromise = new WeakMap(), _AbstractChatCompletionRunner_resolveEndPromise = new WeakMap(), _AbstractChatCompletionRunner_rejectEndPromise = new WeakMap(), _AbstractChatCompletionRunner_listeners = new WeakMap(), _AbstractChatCompletionRunner_ended = new WeakMap(), _AbstractChatCompletionRunner_errored = new WeakMap(), _AbstractChatCompletionRunner_aborted = new WeakMap(), _AbstractChatCompletionRunner_catchingPromiseCreated = new WeakMap(), _AbstractChatCompletionRunner_handleError = new WeakMap(), _AbstractChatCompletionRunner_instances = new WeakSet(), _AbstractChatCompletionRunner_getFinalContent = function _AbstractChatCompletionRunner_getFinalContent() {
-    for (let i = this.messages.length - 1; i >= 0; i--) {
+    return __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_getFinalMessage).call(this).content;
+}, _AbstractChatCompletionRunner_getFinalMessage = function _AbstractChatCompletionRunner_getFinalMessage() {
+    let i = this.messages.length;
+    while (i-- > 0) {
         const message = this.messages[i];
-        if (message?.role === 'assistant')
-            return message.content;
+        if ((0, chatCompletionUtils_1.isAssistantMessage)(message)) {
+            return message;
+        }
     }
-    return null;
+    throw new error_1.OpenAIError('stream ended without producing a ChatCompletionMessage with role=assistant');
 }, _AbstractChatCompletionRunner_getFinalFunctionCall = function _AbstractChatCompletionRunner_getFinalFunctionCall() {
     for (let i = this.messages.length - 1; i >= 0; i--) {
         const message = this.messages[i];
-        if (message?.function_call)
+        if ((0, chatCompletionUtils_1.isAssistantMessage)(message) && message?.function_call) {
             return message.function_call;
+        }
     }
+    return;
 }, _AbstractChatCompletionRunner_getFinalFunctionCallResult = function _AbstractChatCompletionRunner_getFinalFunctionCallResult() {
     for (let i = this.messages.length - 1; i >= 0; i--) {
         const message = this.messages[i];
-        if (message?.role === 'function' && message.content != null)
+        if ((0, chatCompletionUtils_1.isFunctionMessage)(message) && message.content != null) {
             return message.content;
+        }
     }
+    return;
 }, _AbstractChatCompletionRunner_calculateTotalUsage = function _AbstractChatCompletionRunner_calculateTotalUsage() {
     const total = {
         completion_tokens: 0,
@@ -43739,28 +43879,42 @@ _AbstractChatCompletionRunner_connectedPromise = new WeakMap(), _AbstractChatCom
         }
     }
     return total;
+}, _AbstractChatCompletionRunner_validateParams = function _AbstractChatCompletionRunner_validateParams(params) {
+    if (params.n != null && params.n > 1) {
+        throw new error_1.OpenAIError('ChatCompletion convenience helpers only support n=1 at this time. To use n>1, please use chat.completions.create() directly.');
+    }
+}, _AbstractChatCompletionRunner_stringifyFunctionCallResult = function _AbstractChatCompletionRunner_stringifyFunctionCallResult(rawContent) {
+    return (typeof rawContent === 'string' ? rawContent
+        : rawContent === undefined ? 'undefined'
+            : JSON.stringify(rawContent));
 };
 //# sourceMappingURL=AbstractChatCompletionRunner.js.map
 
 /***/ }),
 
-/***/ 6951:
+/***/ 626:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionRunner = void 0;
-const AbstractChatCompletionRunner_1 = __nccwpck_require__(8065);
+const AbstractChatCompletionRunner_1 = __nccwpck_require__(6731);
+const chatCompletionUtils_1 = __nccwpck_require__(6220);
 class ChatCompletionRunner extends AbstractChatCompletionRunner_1.AbstractChatCompletionRunner {
     static runFunctions(completions, params, options) {
         const runner = new ChatCompletionRunner();
         runner._run(() => runner._runFunctions(completions, params, options));
         return runner;
     }
+    static runTools(completions, params, options) {
+        const runner = new ChatCompletionRunner();
+        runner._run(() => runner._runTools(completions, params, options));
+        return runner;
+    }
     _addMessage(message) {
         super._addMessage(message);
-        if (message.role === 'assistant' && message.content) {
+        if ((0, chatCompletionUtils_1.isAssistantMessage)(message) && message.content) {
             this._emit('content', message.content);
         }
     }
@@ -43770,7 +43924,7 @@ exports.ChatCompletionRunner = ChatCompletionRunner;
 
 /***/ }),
 
-/***/ 4218:
+/***/ 3309:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -43789,9 +43943,9 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
 var _ChatCompletionStream_instances, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_beginRequest, _ChatCompletionStream_addChunk, _ChatCompletionStream_endRequest, _ChatCompletionStream_accumulateChatCompletion;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionStream = void 0;
-const error_1 = __nccwpck_require__(8817);
-const AbstractChatCompletionRunner_1 = __nccwpck_require__(8065);
-const streaming_1 = __nccwpck_require__(2947);
+const error_1 = __nccwpck_require__(3092);
+const AbstractChatCompletionRunner_1 = __nccwpck_require__(6731);
+const streaming_1 = __nccwpck_require__(4439);
 class ChatCompletionStream extends AbstractChatCompletionRunner_1.AbstractChatCompletionRunner {
     constructor() {
         super(...arguments);
@@ -43815,7 +43969,7 @@ class ChatCompletionStream extends AbstractChatCompletionRunner_1.AbstractChatCo
     }
     static createChatCompletion(completions, params, options) {
         const runner = new ChatCompletionStream();
-        runner._run(() => runner._runChatCompletion(completions, { ...params, stream: true }, options));
+        runner._run(() => runner._runChatCompletion(completions, { ...params, stream: true }, { ...options, headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'stream' } }));
         return runner;
     }
     async _createChatCompletion(completions, params, options) {
@@ -43869,7 +44023,7 @@ class ChatCompletionStream extends AbstractChatCompletionRunner_1.AbstractChatCo
             return;
         const completion = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_accumulateChatCompletion).call(this, chunk);
         this._emit('chunk', chunk, completion);
-        const delta = chunk.choices[0]?.delta.content;
+        const delta = chunk.choices[0]?.delta?.content;
         const snapshot = completion.choices[0]?.message;
         if (delta != null && snapshot?.role === 'assistant' && snapshot?.content) {
             this._emit('content', delta, snapshot.content);
@@ -43885,36 +44039,62 @@ class ChatCompletionStream extends AbstractChatCompletionRunner_1.AbstractChatCo
         __classPrivateFieldSet(this, _ChatCompletionStream_currentChatCompletionSnapshot, undefined, "f");
         return finalizeChatCompletion(snapshot);
     }, _ChatCompletionStream_accumulateChatCompletion = function _ChatCompletionStream_accumulateChatCompletion(chunk) {
+        var _a, _b;
         let snapshot = __classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f");
+        const { choices, ...rest } = chunk;
         if (!snapshot) {
-            const { choices, ...rest } = chunk;
-            __classPrivateFieldSet(this, _ChatCompletionStream_currentChatCompletionSnapshot, snapshot = {
+            snapshot = __classPrivateFieldSet(this, _ChatCompletionStream_currentChatCompletionSnapshot, {
                 ...rest,
                 choices: [],
             }, "f");
         }
-        for (const { delta, finish_reason, index } of chunk.choices) {
+        else {
+            Object.assign(snapshot, rest);
+        }
+        for (const { delta, finish_reason, index, ...other } of chunk.choices) {
             let choice = snapshot.choices[index];
-            if (!choice)
-                snapshot.choices[index] = choice = { finish_reason, index, message: delta };
-            else {
-                if (finish_reason)
-                    choice.finish_reason = finish_reason;
-                const { content, function_call, role } = delta;
-                if (content)
-                    choice.message.content = (choice.message.content || '') + content;
-                if (role)
-                    choice.message.role = role;
-                if (function_call) {
-                    if (!choice.message.function_call)
-                        choice.message.function_call = function_call;
-                    else {
-                        if (function_call.arguments)
-                            choice.message.function_call.arguments =
-                                (choice.message.function_call.arguments || '') + function_call.arguments;
-                        if (function_call.name)
-                            choice.message.function_call.name = function_call.name;
+            if (!choice) {
+                snapshot.choices[index] = { finish_reason, index, message: delta, ...other };
+                continue;
+            }
+            if (finish_reason)
+                choice.finish_reason = finish_reason;
+            Object.assign(choice, other);
+            if (!delta)
+                continue; // Shouldn't happen; just in case.
+            const { content, function_call, role, tool_calls } = delta;
+            if (content)
+                choice.message.content = (choice.message.content || '') + content;
+            if (role)
+                choice.message.role = role;
+            if (function_call) {
+                if (!choice.message.function_call) {
+                    choice.message.function_call = function_call;
+                }
+                else {
+                    if (function_call.name)
+                        choice.message.function_call.name = function_call.name;
+                    if (function_call.arguments) {
+                        (_a = choice.message.function_call).arguments ?? (_a.arguments = '');
+                        choice.message.function_call.arguments += function_call.arguments;
                     }
+                }
+            }
+            if (tool_calls) {
+                if (!choice.message.tool_calls)
+                    choice.message.tool_calls = [];
+                for (const { index, id, type, function: fn } of tool_calls) {
+                    const tool_call = ((_b = choice.message.tool_calls)[index] ?? (_b[index] = {}));
+                    if (id)
+                        tool_call.id = id;
+                    if (type)
+                        tool_call.type = type;
+                    if (fn)
+                        tool_call.function ?? (tool_call.function = { arguments: '' });
+                    if (fn?.name)
+                        tool_call.function.name = fn.name;
+                    if (fn?.arguments)
+                        tool_call.function.arguments += fn.arguments;
                 }
             }
         }
@@ -43965,7 +44145,8 @@ function finalizeChatCompletion(snapshot) {
         choices: choices.map(({ message, finish_reason, index }) => {
             if (!finish_reason)
                 throw new error_1.OpenAIError(`missing finish_reason for choice ${index}`);
-            const { content = null, function_call, role } = message;
+            const { content = null, function_call, tool_calls } = message;
+            const role = message.role; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
             if (!role)
                 throw new error_1.OpenAIError(`missing role for choice ${index}`);
             if (function_call) {
@@ -43976,6 +44157,29 @@ function finalizeChatCompletion(snapshot) {
                     throw new error_1.OpenAIError(`missing function_call.name for choice ${index}`);
                 return { message: { content, function_call: { arguments: args, name }, role }, finish_reason, index };
             }
+            if (tool_calls) {
+                return {
+                    index,
+                    finish_reason,
+                    message: {
+                        role,
+                        content,
+                        tool_calls: tool_calls.map((tool_call, i) => {
+                            const { function: fn, type, id } = tool_call;
+                            const { arguments: args, name } = fn || {};
+                            if (id == null)
+                                throw new error_1.OpenAIError(`missing choices[${index}].tool_calls[${i}].id\n${str(snapshot)}`);
+                            if (type == null)
+                                throw new error_1.OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
+                            if (name == null)
+                                throw new error_1.OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name\n${str(snapshot)}`);
+                            if (args == null)
+                                throw new error_1.OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments\n${str(snapshot)}`);
+                            return { id, type, function: { name, arguments: args } };
+                        }),
+                    },
+                };
+            }
             return { message: { content: content, role }, finish_reason, index };
         }),
         created,
@@ -43983,18 +44187,21 @@ function finalizeChatCompletion(snapshot) {
         object: 'chat.completion',
     };
 }
+function str(x) {
+    return JSON.stringify(x);
+}
 //# sourceMappingURL=ChatCompletionStream.js.map
 
 /***/ }),
 
-/***/ 5062:
+/***/ 5254:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionStreamingRunner = void 0;
-const ChatCompletionStream_1 = __nccwpck_require__(4218);
+const ChatCompletionStream_1 = __nccwpck_require__(3309);
 class ChatCompletionStreamingRunner extends ChatCompletionStream_1.ChatCompletionStream {
     static fromReadableStream(stream) {
         const runner = new ChatCompletionStreamingRunner();
@@ -44003,7 +44210,18 @@ class ChatCompletionStreamingRunner extends ChatCompletionStream_1.ChatCompletio
     }
     static runFunctions(completions, params, options) {
         const runner = new ChatCompletionStreamingRunner();
-        runner._run(() => runner._runFunctions(completions, params, options));
+        runner._run(() => runner._runFunctions(completions, params, {
+            ...options,
+            headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runFunctions' },
+        }));
+        return runner;
+    }
+    static runTools(completions, params, options) {
+        const runner = new ChatCompletionStreamingRunner();
+        runner._run(() => runner._runTools(completions, params, {
+            ...options,
+            headers: { ...options?.headers, 'X-Stainless-Helper-Method': 'runTools' },
+        }));
         return runner;
     }
 }
@@ -44012,7 +44230,7 @@ exports.ChatCompletionStreamingRunner = ChatCompletionStreamingRunner;
 
 /***/ }),
 
-/***/ 9936:
+/***/ 4488:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -44041,7 +44259,34 @@ exports.ParsingFunction = ParsingFunction;
 
 /***/ }),
 
-/***/ 3682:
+/***/ 6220:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isPresent = exports.isToolMessage = exports.isFunctionMessage = exports.isAssistantMessage = void 0;
+const isAssistantMessage = (message) => {
+    return message?.role === 'assistant';
+};
+exports.isAssistantMessage = isAssistantMessage;
+const isFunctionMessage = (message) => {
+    return message?.role === 'function';
+};
+exports.isFunctionMessage = isFunctionMessage;
+const isToolMessage = (message) => {
+    return message?.role === 'tool';
+};
+exports.isToolMessage = isToolMessage;
+function isPresent(obj) {
+    return obj != null;
+}
+exports.isPresent = isPresent;
+//# sourceMappingURL=chatCompletionUtils.js.map
+
+/***/ }),
+
+/***/ 1456:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44049,7 +44294,7 @@ exports.ParsingFunction = ParsingFunction;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CursorPage = exports.Page = void 0;
-const core_1 = __nccwpck_require__(9703);
+const core_1 = __nccwpck_require__(4739);
 /**
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
@@ -44110,7 +44355,7 @@ exports.CursorPage = CursorPage;
 
 /***/ }),
 
-/***/ 6529:
+/***/ 1879:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -44120,13 +44365,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.APIResource = void 0;
 class APIResource {
     constructor(client) {
-        this.client = client;
-        this.get = client.get.bind(client);
-        this.post = client.post.bind(client);
-        this.patch = client.patch.bind(client);
-        this.put = client.put.bind(client);
-        this.delete = client.delete.bind(client);
-        this.getAPIList = client.getAPIList.bind(client);
+        this._client = client;
     }
 }
 exports.APIResource = APIResource;
@@ -44134,7 +44373,7 @@ exports.APIResource = APIResource;
 
 /***/ }),
 
-/***/ 6627:
+/***/ 1540:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44165,26 +44404,53 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Audio = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const TranscriptionsAPI = __importStar(__nccwpck_require__(9082));
-const TranslationsAPI = __importStar(__nccwpck_require__(1342));
+const resource_1 = __nccwpck_require__(1879);
+const SpeechAPI = __importStar(__nccwpck_require__(1630));
+const TranscriptionsAPI = __importStar(__nccwpck_require__(6708));
+const TranslationsAPI = __importStar(__nccwpck_require__(5115));
 class Audio extends resource_1.APIResource {
     constructor() {
         super(...arguments);
-        this.transcriptions = new TranscriptionsAPI.Transcriptions(this.client);
-        this.translations = new TranslationsAPI.Translations(this.client);
+        this.transcriptions = new TranscriptionsAPI.Transcriptions(this._client);
+        this.translations = new TranslationsAPI.Translations(this._client);
+        this.speech = new SpeechAPI.Speech(this._client);
     }
 }
 exports.Audio = Audio;
 (function (Audio) {
     Audio.Transcriptions = TranscriptionsAPI.Transcriptions;
     Audio.Translations = TranslationsAPI.Translations;
+    Audio.Speech = SpeechAPI.Speech;
 })(Audio = exports.Audio || (exports.Audio = {}));
 //# sourceMappingURL=audio.js.map
 
 /***/ }),
 
-/***/ 9082:
+/***/ 1630:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Speech = void 0;
+const resource_1 = __nccwpck_require__(1879);
+class Speech extends resource_1.APIResource {
+    /**
+     * Generates audio from the input text.
+     */
+    create(body, options) {
+        return this._client.post('/audio/speech', { body, ...options, __binaryResponse: true });
+    }
+}
+exports.Speech = Speech;
+(function (Speech) {
+})(Speech = exports.Speech || (exports.Speech = {}));
+//# sourceMappingURL=speech.js.map
+
+/***/ }),
+
+/***/ 6708:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44192,14 +44458,14 @@ exports.Audio = Audio;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Transcriptions = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const core_1 = __nccwpck_require__(9703);
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
 class Transcriptions extends resource_1.APIResource {
     /**
      * Transcribes audio into the input language.
      */
     create(body, options) {
-        return this.post('/audio/transcriptions', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
+        return this._client.post('/audio/transcriptions', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
     }
 }
 exports.Transcriptions = Transcriptions;
@@ -44209,7 +44475,7 @@ exports.Transcriptions = Transcriptions;
 
 /***/ }),
 
-/***/ 1342:
+/***/ 5115:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44217,14 +44483,14 @@ exports.Transcriptions = Transcriptions;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Translations = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const core_1 = __nccwpck_require__(9703);
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
 class Translations extends resource_1.APIResource {
     /**
      * Translates audio into English.
      */
     create(body, options) {
-        return this.post('/audio/translations', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
+        return this._client.post('/audio/translations', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
     }
 }
 exports.Translations = Translations;
@@ -44234,7 +44500,198 @@ exports.Translations = Translations;
 
 /***/ }),
 
-/***/ 9648:
+/***/ 4265:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AssistantsPage = exports.Assistants = void 0;
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const AssistantsAPI = __importStar(__nccwpck_require__(4265));
+const FilesAPI = __importStar(__nccwpck_require__(1831));
+const pagination_1 = __nccwpck_require__(1456);
+class Assistants extends resource_1.APIResource {
+    constructor() {
+        super(...arguments);
+        this.files = new FilesAPI.Files(this._client);
+    }
+    /**
+     * Create an assistant with a model and instructions.
+     */
+    create(body, options) {
+        return this._client.post('/assistants', {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Retrieves an assistant.
+     */
+    retrieve(assistantId, options) {
+        return this._client.get(`/assistants/${assistantId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Modifies an assistant.
+     */
+    update(assistantId, body, options) {
+        return this._client.post(`/assistants/${assistantId}`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    list(query = {}, options) {
+        if ((0, core_1.isRequestOptions)(query)) {
+            return this.list({}, query);
+        }
+        return this._client.getAPIList('/assistants', AssistantsPage, {
+            query,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Delete an assistant.
+     */
+    del(assistantId, options) {
+        return this._client.delete(`/assistants/${assistantId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+}
+exports.Assistants = Assistants;
+class AssistantsPage extends pagination_1.CursorPage {
+}
+exports.AssistantsPage = AssistantsPage;
+(function (Assistants) {
+    Assistants.AssistantsPage = AssistantsAPI.AssistantsPage;
+    Assistants.Files = FilesAPI.Files;
+    Assistants.AssistantFilesPage = FilesAPI.AssistantFilesPage;
+})(Assistants = exports.Assistants || (exports.Assistants = {}));
+//# sourceMappingURL=assistants.js.map
+
+/***/ }),
+
+/***/ 1831:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AssistantFilesPage = exports.Files = void 0;
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const FilesAPI = __importStar(__nccwpck_require__(1831));
+const pagination_1 = __nccwpck_require__(1456);
+class Files extends resource_1.APIResource {
+    /**
+     * Create an assistant file by attaching a
+     * [File](https://platform.openai.com/docs/api-reference/files) to an
+     * [assistant](https://platform.openai.com/docs/api-reference/assistants).
+     */
+    create(assistantId, body, options) {
+        return this._client.post(`/assistants/${assistantId}/files`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Retrieves an AssistantFile.
+     */
+    retrieve(assistantId, fileId, options) {
+        return this._client.get(`/assistants/${assistantId}/files/${fileId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    list(assistantId, query = {}, options) {
+        if ((0, core_1.isRequestOptions)(query)) {
+            return this.list(assistantId, {}, query);
+        }
+        return this._client.getAPIList(`/assistants/${assistantId}/files`, AssistantFilesPage, {
+            query,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Delete an assistant file.
+     */
+    del(assistantId, fileId, options) {
+        return this._client.delete(`/assistants/${assistantId}/files/${fileId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+}
+exports.Files = Files;
+class AssistantFilesPage extends pagination_1.CursorPage {
+}
+exports.AssistantFilesPage = AssistantFilesPage;
+(function (Files) {
+    Files.AssistantFilesPage = FilesAPI.AssistantFilesPage;
+})(Files = exports.Files || (exports.Files = {}));
+//# sourceMappingURL=files.js.map
+
+/***/ }),
+
+/***/ 9409:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44265,23 +44722,30 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Beta = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const ChatAPI = __importStar(__nccwpck_require__(7872));
+const resource_1 = __nccwpck_require__(1879);
+const AssistantsAPI = __importStar(__nccwpck_require__(4265));
+const ChatAPI = __importStar(__nccwpck_require__(8239));
+const ThreadsAPI = __importStar(__nccwpck_require__(1188));
 class Beta extends resource_1.APIResource {
     constructor() {
         super(...arguments);
-        this.chat = new ChatAPI.Chat(this.client);
+        this.chat = new ChatAPI.Chat(this._client);
+        this.assistants = new AssistantsAPI.Assistants(this._client);
+        this.threads = new ThreadsAPI.Threads(this._client);
     }
 }
 exports.Beta = Beta;
 (function (Beta) {
     Beta.Chat = ChatAPI.Chat;
+    Beta.Assistants = AssistantsAPI.Assistants;
+    Beta.AssistantsPage = AssistantsAPI.AssistantsPage;
+    Beta.Threads = ThreadsAPI.Threads;
 })(Beta = exports.Beta || (exports.Beta = {}));
 //# sourceMappingURL=beta.js.map
 
 /***/ }),
 
-/***/ 7872:
+/***/ 8239:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44312,12 +44776,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Chat = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const CompletionsAPI = __importStar(__nccwpck_require__(6545));
+const resource_1 = __nccwpck_require__(1879);
+const CompletionsAPI = __importStar(__nccwpck_require__(9569));
 class Chat extends resource_1.APIResource {
     constructor() {
         super(...arguments);
-        this.completions = new CompletionsAPI.Completions(this.client);
+        this.completions = new CompletionsAPI.Completions(this._client);
     }
 }
 exports.Chat = Chat;
@@ -44328,7 +44792,7 @@ exports.Chat = Chat;
 
 /***/ }),
 
-/***/ 6545:
+/***/ 9569:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44336,30 +44800,36 @@ exports.Chat = Chat;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Completions = exports.ChatCompletionStream = exports.ParsingFunction = exports.ChatCompletionStreamingRunner = exports.ChatCompletionRunner = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const ChatCompletionRunner_1 = __nccwpck_require__(6951);
-var ChatCompletionRunner_2 = __nccwpck_require__(6951);
+const resource_1 = __nccwpck_require__(1879);
+const ChatCompletionRunner_1 = __nccwpck_require__(626);
+var ChatCompletionRunner_2 = __nccwpck_require__(626);
 Object.defineProperty(exports, "ChatCompletionRunner", ({ enumerable: true, get: function () { return ChatCompletionRunner_2.ChatCompletionRunner; } }));
-const ChatCompletionStreamingRunner_1 = __nccwpck_require__(5062);
-var ChatCompletionStreamingRunner_2 = __nccwpck_require__(5062);
+const ChatCompletionStreamingRunner_1 = __nccwpck_require__(5254);
+var ChatCompletionStreamingRunner_2 = __nccwpck_require__(5254);
 Object.defineProperty(exports, "ChatCompletionStreamingRunner", ({ enumerable: true, get: function () { return ChatCompletionStreamingRunner_2.ChatCompletionStreamingRunner; } }));
-var RunnableFunction_1 = __nccwpck_require__(9936);
+var RunnableFunction_1 = __nccwpck_require__(4488);
 Object.defineProperty(exports, "ParsingFunction", ({ enumerable: true, get: function () { return RunnableFunction_1.ParsingFunction; } }));
-const ChatCompletionStream_1 = __nccwpck_require__(4218);
-var ChatCompletionStream_2 = __nccwpck_require__(4218);
+const ChatCompletionStream_1 = __nccwpck_require__(3309);
+var ChatCompletionStream_2 = __nccwpck_require__(3309);
 Object.defineProperty(exports, "ChatCompletionStream", ({ enumerable: true, get: function () { return ChatCompletionStream_2.ChatCompletionStream; } }));
 class Completions extends resource_1.APIResource {
     runFunctions(body, options) {
         if (body.stream) {
-            return ChatCompletionStreamingRunner_1.ChatCompletionStreamingRunner.runFunctions(this.client.chat.completions, body, options);
+            return ChatCompletionStreamingRunner_1.ChatCompletionStreamingRunner.runFunctions(this._client.chat.completions, body, options);
         }
-        return ChatCompletionRunner_1.ChatCompletionRunner.runFunctions(this.client.chat.completions, body, options);
+        return ChatCompletionRunner_1.ChatCompletionRunner.runFunctions(this._client.chat.completions, body, options);
+    }
+    runTools(body, options) {
+        if (body.stream) {
+            return ChatCompletionStreamingRunner_1.ChatCompletionStreamingRunner.runTools(this._client.chat.completions, body, options);
+        }
+        return ChatCompletionRunner_1.ChatCompletionRunner.runTools(this._client.chat.completions, body, options);
     }
     /**
      * Creates a chat completion stream
      */
     stream(body, options) {
-        return ChatCompletionStream_1.ChatCompletionStream.createChatCompletion(this.client.chat.completions, body, options);
+        return ChatCompletionStream_1.ChatCompletionStream.createChatCompletion(this._client.chat.completions, body, options);
     }
 }
 exports.Completions = Completions;
@@ -44367,7 +44837,452 @@ exports.Completions = Completions;
 
 /***/ }),
 
-/***/ 1509:
+/***/ 5786:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.MessageFilesPage = exports.Files = void 0;
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const FilesAPI = __importStar(__nccwpck_require__(5786));
+const pagination_1 = __nccwpck_require__(1456);
+class Files extends resource_1.APIResource {
+    /**
+     * Retrieves a message file.
+     */
+    retrieve(threadId, messageId, fileId, options) {
+        return this._client.get(`/threads/${threadId}/messages/${messageId}/files/${fileId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    list(threadId, messageId, query = {}, options) {
+        if ((0, core_1.isRequestOptions)(query)) {
+            return this.list(threadId, messageId, {}, query);
+        }
+        return this._client.getAPIList(`/threads/${threadId}/messages/${messageId}/files`, MessageFilesPage, {
+            query,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+}
+exports.Files = Files;
+class MessageFilesPage extends pagination_1.CursorPage {
+}
+exports.MessageFilesPage = MessageFilesPage;
+(function (Files) {
+    Files.MessageFilesPage = FilesAPI.MessageFilesPage;
+})(Files = exports.Files || (exports.Files = {}));
+//# sourceMappingURL=files.js.map
+
+/***/ }),
+
+/***/ 4001:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ThreadMessagesPage = exports.Messages = void 0;
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const MessagesAPI = __importStar(__nccwpck_require__(4001));
+const FilesAPI = __importStar(__nccwpck_require__(5786));
+const pagination_1 = __nccwpck_require__(1456);
+class Messages extends resource_1.APIResource {
+    constructor() {
+        super(...arguments);
+        this.files = new FilesAPI.Files(this._client);
+    }
+    /**
+     * Create a message.
+     */
+    create(threadId, body, options) {
+        return this._client.post(`/threads/${threadId}/messages`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Retrieve a message.
+     */
+    retrieve(threadId, messageId, options) {
+        return this._client.get(`/threads/${threadId}/messages/${messageId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Modifies a message.
+     */
+    update(threadId, messageId, body, options) {
+        return this._client.post(`/threads/${threadId}/messages/${messageId}`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    list(threadId, query = {}, options) {
+        if ((0, core_1.isRequestOptions)(query)) {
+            return this.list(threadId, {}, query);
+        }
+        return this._client.getAPIList(`/threads/${threadId}/messages`, ThreadMessagesPage, {
+            query,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+}
+exports.Messages = Messages;
+class ThreadMessagesPage extends pagination_1.CursorPage {
+}
+exports.ThreadMessagesPage = ThreadMessagesPage;
+(function (Messages) {
+    Messages.ThreadMessagesPage = MessagesAPI.ThreadMessagesPage;
+    Messages.Files = FilesAPI.Files;
+    Messages.MessageFilesPage = FilesAPI.MessageFilesPage;
+})(Messages = exports.Messages || (exports.Messages = {}));
+//# sourceMappingURL=messages.js.map
+
+/***/ }),
+
+/***/ 4425:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RunsPage = exports.Runs = void 0;
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const RunsAPI = __importStar(__nccwpck_require__(4425));
+const StepsAPI = __importStar(__nccwpck_require__(1407));
+const pagination_1 = __nccwpck_require__(1456);
+class Runs extends resource_1.APIResource {
+    constructor() {
+        super(...arguments);
+        this.steps = new StepsAPI.Steps(this._client);
+    }
+    /**
+     * Create a run.
+     */
+    create(threadId, body, options) {
+        return this._client.post(`/threads/${threadId}/runs`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Retrieves a run.
+     */
+    retrieve(threadId, runId, options) {
+        return this._client.get(`/threads/${threadId}/runs/${runId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Modifies a run.
+     */
+    update(threadId, runId, body, options) {
+        return this._client.post(`/threads/${threadId}/runs/${runId}`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    list(threadId, query = {}, options) {
+        if ((0, core_1.isRequestOptions)(query)) {
+            return this.list(threadId, {}, query);
+        }
+        return this._client.getAPIList(`/threads/${threadId}/runs`, RunsPage, {
+            query,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Cancels a run that is `in_progress`.
+     */
+    cancel(threadId, runId, options) {
+        return this._client.post(`/threads/${threadId}/runs/${runId}/cancel`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * When a run has the `status: "requires_action"` and `required_action.type` is
+     * `submit_tool_outputs`, this endpoint can be used to submit the outputs from the
+     * tool calls once they're all completed. All outputs must be submitted in a single
+     * request.
+     */
+    submitToolOutputs(threadId, runId, body, options) {
+        return this._client.post(`/threads/${threadId}/runs/${runId}/submit_tool_outputs`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+}
+exports.Runs = Runs;
+class RunsPage extends pagination_1.CursorPage {
+}
+exports.RunsPage = RunsPage;
+(function (Runs) {
+    Runs.RunsPage = RunsAPI.RunsPage;
+    Runs.Steps = StepsAPI.Steps;
+    Runs.RunStepsPage = StepsAPI.RunStepsPage;
+})(Runs = exports.Runs || (exports.Runs = {}));
+//# sourceMappingURL=runs.js.map
+
+/***/ }),
+
+/***/ 1407:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RunStepsPage = exports.Steps = void 0;
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const StepsAPI = __importStar(__nccwpck_require__(1407));
+const pagination_1 = __nccwpck_require__(1456);
+class Steps extends resource_1.APIResource {
+    /**
+     * Retrieves a run step.
+     */
+    retrieve(threadId, runId, stepId, options) {
+        return this._client.get(`/threads/${threadId}/runs/${runId}/steps/${stepId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    list(threadId, runId, query = {}, options) {
+        if ((0, core_1.isRequestOptions)(query)) {
+            return this.list(threadId, runId, {}, query);
+        }
+        return this._client.getAPIList(`/threads/${threadId}/runs/${runId}/steps`, RunStepsPage, {
+            query,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+}
+exports.Steps = Steps;
+class RunStepsPage extends pagination_1.CursorPage {
+}
+exports.RunStepsPage = RunStepsPage;
+(function (Steps) {
+    Steps.RunStepsPage = StepsAPI.RunStepsPage;
+})(Steps = exports.Steps || (exports.Steps = {}));
+//# sourceMappingURL=steps.js.map
+
+/***/ }),
+
+/***/ 1188:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Threads = void 0;
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const MessagesAPI = __importStar(__nccwpck_require__(4001));
+const RunsAPI = __importStar(__nccwpck_require__(4425));
+class Threads extends resource_1.APIResource {
+    constructor() {
+        super(...arguments);
+        this.runs = new RunsAPI.Runs(this._client);
+        this.messages = new MessagesAPI.Messages(this._client);
+    }
+    create(body = {}, options) {
+        if ((0, core_1.isRequestOptions)(body)) {
+            return this.create({}, body);
+        }
+        return this._client.post('/threads', {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Retrieves a thread.
+     */
+    retrieve(threadId, options) {
+        return this._client.get(`/threads/${threadId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Modifies a thread.
+     */
+    update(threadId, body, options) {
+        return this._client.post(`/threads/${threadId}`, {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Delete a thread.
+     */
+    del(threadId, options) {
+        return this._client.delete(`/threads/${threadId}`, {
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+    /**
+     * Create a thread and run it in one request.
+     */
+    createAndRun(body, options) {
+        return this._client.post('/threads/runs', {
+            body,
+            ...options,
+            headers: { 'OpenAI-Beta': 'assistants=v1', ...options?.headers },
+        });
+    }
+}
+exports.Threads = Threads;
+(function (Threads) {
+    Threads.Runs = RunsAPI.Runs;
+    Threads.RunsPage = RunsAPI.RunsPage;
+    Threads.Messages = MessagesAPI.Messages;
+    Threads.ThreadMessagesPage = MessagesAPI.ThreadMessagesPage;
+})(Threads = exports.Threads || (exports.Threads = {}));
+//# sourceMappingURL=threads.js.map
+
+/***/ }),
+
+/***/ 119:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44398,12 +45313,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Chat = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const CompletionsAPI = __importStar(__nccwpck_require__(6566));
+const resource_1 = __nccwpck_require__(1879);
+const CompletionsAPI = __importStar(__nccwpck_require__(3103));
 class Chat extends resource_1.APIResource {
     constructor() {
         super(...arguments);
-        this.completions = new CompletionsAPI.Completions(this.client);
+        this.completions = new CompletionsAPI.Completions(this._client);
     }
 }
 exports.Chat = Chat;
@@ -44414,7 +45329,7 @@ exports.Chat = Chat;
 
 /***/ }),
 
-/***/ 6566:
+/***/ 3103:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44422,10 +45337,10 @@ exports.Chat = Chat;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Completions = void 0;
-const resource_1 = __nccwpck_require__(6529);
+const resource_1 = __nccwpck_require__(1879);
 class Completions extends resource_1.APIResource {
     create(body, options) {
-        return this.post('/chat/completions', { body, ...options, stream: body.stream ?? false });
+        return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false });
     }
 }
 exports.Completions = Completions;
@@ -44435,7 +45350,7 @@ exports.Completions = Completions;
 
 /***/ }),
 
-/***/ 261:
+/***/ 3708:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44443,15 +45358,15 @@ exports.Completions = Completions;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Completions = exports.Chat = void 0;
-var chat_1 = __nccwpck_require__(1509);
+var chat_1 = __nccwpck_require__(119);
 Object.defineProperty(exports, "Chat", ({ enumerable: true, get: function () { return chat_1.Chat; } }));
-var completions_1 = __nccwpck_require__(6566);
+var completions_1 = __nccwpck_require__(3103);
 Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function () { return completions_1.Completions; } }));
 //# sourceMappingURL=index.js.map
 
 /***/ }),
 
-/***/ 1317:
+/***/ 5013:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44459,10 +45374,10 @@ Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Completions = void 0;
-const resource_1 = __nccwpck_require__(6529);
+const resource_1 = __nccwpck_require__(1879);
 class Completions extends resource_1.APIResource {
     create(body, options) {
-        return this.post('/completions', { body, ...options, stream: body.stream ?? false });
+        return this._client.post('/completions', { body, ...options, stream: body.stream ?? false });
     }
 }
 exports.Completions = Completions;
@@ -44472,7 +45387,7 @@ exports.Completions = Completions;
 
 /***/ }),
 
-/***/ 6982:
+/***/ 9245:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44480,7 +45395,7 @@ exports.Completions = Completions;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Edits = void 0;
-const resource_1 = __nccwpck_require__(6529);
+const resource_1 = __nccwpck_require__(1879);
 class Edits extends resource_1.APIResource {
     /**
      * Creates a new edit for the provided input, instruction, and parameters.
@@ -44490,7 +45405,7 @@ class Edits extends resource_1.APIResource {
      * https://openai.com/blog/gpt-4-api-general-availability#deprecation-of-the-edits-api
      */
     create(body, options) {
-        return this.post('/edits', { body, ...options });
+        return this._client.post('/edits', { body, ...options });
     }
 }
 exports.Edits = Edits;
@@ -44500,7 +45415,7 @@ exports.Edits = Edits;
 
 /***/ }),
 
-/***/ 506:
+/***/ 7394:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44508,13 +45423,13 @@ exports.Edits = Edits;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Embeddings = void 0;
-const resource_1 = __nccwpck_require__(6529);
+const resource_1 = __nccwpck_require__(1879);
 class Embeddings extends resource_1.APIResource {
     /**
      * Creates an embedding vector representing the input text.
      */
     create(body, options) {
-        return this.post('/embeddings', { body, ...options });
+        return this._client.post('/embeddings', { body, ...options });
     }
 }
 exports.Embeddings = Embeddings;
@@ -44524,7 +45439,7 @@ exports.Embeddings = Embeddings;
 
 /***/ }),
 
-/***/ 8745:
+/***/ 5782:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44555,45 +45470,60 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FileObjectsPage = exports.Files = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const core_1 = __nccwpck_require__(9703);
-const error_1 = __nccwpck_require__(8817);
-const FilesAPI = __importStar(__nccwpck_require__(8745));
-const core_2 = __nccwpck_require__(9703);
-const pagination_1 = __nccwpck_require__(3682);
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const core_2 = __nccwpck_require__(4739);
+const error_1 = __nccwpck_require__(3092);
+const FilesAPI = __importStar(__nccwpck_require__(5782));
+const core_3 = __nccwpck_require__(4739);
+const pagination_1 = __nccwpck_require__(1456);
 class Files extends resource_1.APIResource {
     /**
-     * Upload a file that can be used across various endpoints/features. Currently, the
-     * size of all the files uploaded by one organization can be up to 1 GB. Please
-     * [contact us](https://help.openai.com/) if you need to increase the storage
-     * limit.
+     * Upload a file that can be used across various endpoints/features. The size of
+     * all the files uploaded by one organization can be up to 100 GB.
+     *
+     * The size of individual files for can be a maximum of 512MB. See the
+     * [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools) to
+     * learn more about the types of files supported. The Fine-tuning API only supports
+     * `.jsonl` files.
+     *
+     * Please [contact us](https://help.openai.com/) if you need to increase these
+     * storage limits.
      */
     create(body, options) {
-        return this.post('/files', (0, core_2.multipartFormRequestOptions)({ body, ...options }));
+        return this._client.post('/files', (0, core_3.multipartFormRequestOptions)({ body, ...options }));
     }
     /**
      * Returns information about a specific file.
      */
     retrieve(fileId, options) {
-        return this.get(`/files/${fileId}`, options);
+        return this._client.get(`/files/${fileId}`, options);
     }
-    /**
-     * Returns a list of files that belong to the user's organization.
-     */
-    list(options) {
-        return this.getAPIList('/files', FileObjectsPage, options);
+    list(query = {}, options) {
+        if ((0, core_1.isRequestOptions)(query)) {
+            return this.list({}, query);
+        }
+        return this._client.getAPIList('/files', FileObjectsPage, { query, ...options });
     }
     /**
      * Delete a file.
      */
     del(fileId, options) {
-        return this.delete(`/files/${fileId}`, options);
+        return this._client.delete(`/files/${fileId}`, options);
     }
     /**
      * Returns the contents of the specified file.
      */
+    content(fileId, options) {
+        return this._client.get(`/files/${fileId}/content`, { ...options, __binaryResponse: true });
+    }
+    /**
+     * Returns the contents of the specified file.
+     *
+     * @deprecated The `.content()` method should be used instead
+     */
     retrieveContent(fileId, options) {
-        return this.get(`/files/${fileId}/content`, {
+        return this._client.get(`/files/${fileId}/content`, {
             ...options,
             headers: { Accept: 'application/json', ...options?.headers },
         });
@@ -44606,7 +45536,7 @@ class Files extends resource_1.APIResource {
         const start = Date.now();
         let file = await this.retrieve(id);
         while (!file.status || !TERMINAL_STATES.has(file.status)) {
-            await (0, core_1.sleep)(pollInterval);
+            await (0, core_2.sleep)(pollInterval);
             file = await this.retrieve(id);
             if (Date.now() - start > maxWait) {
                 throw new error_1.APIConnectionTimeoutError({
@@ -44631,7 +45561,7 @@ exports.FileObjectsPage = FileObjectsPage;
 
 /***/ }),
 
-/***/ 6657:
+/***/ 7187:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44662,9 +45592,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FineTunesPage = exports.FineTunes = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const FineTunesAPI = __importStar(__nccwpck_require__(6657));
-const pagination_1 = __nccwpck_require__(3682);
+const resource_1 = __nccwpck_require__(1879);
+const FineTunesAPI = __importStar(__nccwpck_require__(7187));
+const pagination_1 = __nccwpck_require__(1456);
 class FineTunes extends resource_1.APIResource {
     /**
      * Creates a job that fine-tunes a specified model from a given dataset.
@@ -44675,7 +45605,7 @@ class FineTunes extends resource_1.APIResource {
      * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/legacy-fine-tuning)
      */
     create(body, options) {
-        return this.post('/fine-tunes', { body, ...options });
+        return this._client.post('/fine-tunes', { body, ...options });
     }
     /**
      * Gets info about the fine-tune job.
@@ -44683,22 +45613,22 @@ class FineTunes extends resource_1.APIResource {
      * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/legacy-fine-tuning)
      */
     retrieve(fineTuneId, options) {
-        return this.get(`/fine-tunes/${fineTuneId}`, options);
+        return this._client.get(`/fine-tunes/${fineTuneId}`, options);
     }
     /**
      * List your organization's fine-tuning jobs
      */
     list(options) {
-        return this.getAPIList('/fine-tunes', FineTunesPage, options);
+        return this._client.getAPIList('/fine-tunes', FineTunesPage, options);
     }
     /**
      * Immediately cancel a fine-tune job.
      */
     cancel(fineTuneId, options) {
-        return this.post(`/fine-tunes/${fineTuneId}/cancel`, options);
+        return this._client.post(`/fine-tunes/${fineTuneId}/cancel`, options);
     }
     listEvents(fineTuneId, query, options) {
-        return this.get(`/fine-tunes/${fineTuneId}/events`, {
+        return this._client.get(`/fine-tunes/${fineTuneId}/events`, {
             query,
             timeout: 86400000,
             ...options,
@@ -44720,7 +45650,7 @@ exports.FineTunesPage = FineTunesPage;
 
 /***/ }),
 
-/***/ 1026:
+/***/ 7199:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44751,12 +45681,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FineTuning = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const JobsAPI = __importStar(__nccwpck_require__(4041));
+const resource_1 = __nccwpck_require__(1879);
+const JobsAPI = __importStar(__nccwpck_require__(1538));
 class FineTuning extends resource_1.APIResource {
     constructor() {
         super(...arguments);
-        this.jobs = new JobsAPI.Jobs(this.client);
+        this.jobs = new JobsAPI.Jobs(this._client);
     }
 }
 exports.FineTuning = FineTuning;
@@ -44769,7 +45699,7 @@ exports.FineTuning = FineTuning;
 
 /***/ }),
 
-/***/ 4041:
+/***/ 1538:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44800,10 +45730,10 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FineTuningJobEventsPage = exports.FineTuningJobsPage = exports.Jobs = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const core_1 = __nccwpck_require__(9703);
-const JobsAPI = __importStar(__nccwpck_require__(4041));
-const pagination_1 = __nccwpck_require__(3682);
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
+const JobsAPI = __importStar(__nccwpck_require__(1538));
+const pagination_1 = __nccwpck_require__(1456);
 class Jobs extends resource_1.APIResource {
     /**
      * Creates a job that fine-tunes a specified model from a given dataset.
@@ -44814,7 +45744,7 @@ class Jobs extends resource_1.APIResource {
      * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
      */
     create(body, options) {
-        return this.post('/fine_tuning/jobs', { body, ...options });
+        return this._client.post('/fine_tuning/jobs', { body, ...options });
     }
     /**
      * Get info about a fine-tuning job.
@@ -44822,25 +45752,25 @@ class Jobs extends resource_1.APIResource {
      * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
      */
     retrieve(fineTuningJobId, options) {
-        return this.get(`/fine_tuning/jobs/${fineTuningJobId}`, options);
+        return this._client.get(`/fine_tuning/jobs/${fineTuningJobId}`, options);
     }
     list(query = {}, options) {
         if ((0, core_1.isRequestOptions)(query)) {
             return this.list({}, query);
         }
-        return this.getAPIList('/fine_tuning/jobs', FineTuningJobsPage, { query, ...options });
+        return this._client.getAPIList('/fine_tuning/jobs', FineTuningJobsPage, { query, ...options });
     }
     /**
      * Immediately cancel a fine-tune job.
      */
     cancel(fineTuningJobId, options) {
-        return this.post(`/fine_tuning/jobs/${fineTuningJobId}/cancel`, options);
+        return this._client.post(`/fine_tuning/jobs/${fineTuningJobId}/cancel`, options);
     }
     listEvents(fineTuningJobId, query = {}, options) {
         if ((0, core_1.isRequestOptions)(query)) {
             return this.listEvents(fineTuningJobId, {}, query);
         }
-        return this.getAPIList(`/fine_tuning/jobs/${fineTuningJobId}/events`, FineTuningJobEventsPage, {
+        return this._client.getAPIList(`/fine_tuning/jobs/${fineTuningJobId}/events`, FineTuningJobEventsPage, {
             query,
             ...options,
         });
@@ -44861,7 +45791,7 @@ exports.FineTuningJobEventsPage = FineTuningJobEventsPage;
 
 /***/ }),
 
-/***/ 5315:
+/***/ 5401:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -44869,26 +45799,26 @@ exports.FineTuningJobEventsPage = FineTuningJobEventsPage;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Images = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const core_1 = __nccwpck_require__(9703);
+const resource_1 = __nccwpck_require__(1879);
+const core_1 = __nccwpck_require__(4739);
 class Images extends resource_1.APIResource {
     /**
      * Creates a variation of a given image.
      */
     createVariation(body, options) {
-        return this.post('/images/variations', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
+        return this._client.post('/images/variations', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
     }
     /**
      * Creates an edited or extended image given an original image and a prompt.
      */
     edit(body, options) {
-        return this.post('/images/edits', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
+        return this._client.post('/images/edits', (0, core_1.multipartFormRequestOptions)({ body, ...options }));
     }
     /**
      * Creates an image given a prompt.
      */
     generate(body, options) {
-        return this.post('/images/generations', { body, ...options });
+        return this._client.post('/images/generations', { body, ...options });
     }
 }
 exports.Images = Images;
@@ -44898,7 +45828,7 @@ exports.Images = Images;
 
 /***/ }),
 
-/***/ 1435:
+/***/ 8591:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44920,37 +45850,38 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Moderations = exports.Models = exports.ModelsPage = exports.Images = exports.FineTuning = exports.FineTunes = exports.FineTunesPage = exports.Files = exports.FileObjectsPage = exports.Edits = exports.Embeddings = exports.Completions = exports.Beta = exports.Audio = void 0;
-__exportStar(__nccwpck_require__(261), exports);
-var audio_1 = __nccwpck_require__(6627);
+__exportStar(__nccwpck_require__(3708), exports);
+__exportStar(__nccwpck_require__(9458), exports);
+var audio_1 = __nccwpck_require__(1540);
 Object.defineProperty(exports, "Audio", ({ enumerable: true, get: function () { return audio_1.Audio; } }));
-var beta_1 = __nccwpck_require__(9648);
+var beta_1 = __nccwpck_require__(9409);
 Object.defineProperty(exports, "Beta", ({ enumerable: true, get: function () { return beta_1.Beta; } }));
-var completions_1 = __nccwpck_require__(1317);
+var completions_1 = __nccwpck_require__(5013);
 Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function () { return completions_1.Completions; } }));
-var embeddings_1 = __nccwpck_require__(506);
+var embeddings_1 = __nccwpck_require__(7394);
 Object.defineProperty(exports, "Embeddings", ({ enumerable: true, get: function () { return embeddings_1.Embeddings; } }));
-var edits_1 = __nccwpck_require__(6982);
+var edits_1 = __nccwpck_require__(9245);
 Object.defineProperty(exports, "Edits", ({ enumerable: true, get: function () { return edits_1.Edits; } }));
-var files_1 = __nccwpck_require__(8745);
+var files_1 = __nccwpck_require__(5782);
 Object.defineProperty(exports, "FileObjectsPage", ({ enumerable: true, get: function () { return files_1.FileObjectsPage; } }));
 Object.defineProperty(exports, "Files", ({ enumerable: true, get: function () { return files_1.Files; } }));
-var fine_tunes_1 = __nccwpck_require__(6657);
+var fine_tunes_1 = __nccwpck_require__(7187);
 Object.defineProperty(exports, "FineTunesPage", ({ enumerable: true, get: function () { return fine_tunes_1.FineTunesPage; } }));
 Object.defineProperty(exports, "FineTunes", ({ enumerable: true, get: function () { return fine_tunes_1.FineTunes; } }));
-var fine_tuning_1 = __nccwpck_require__(1026);
+var fine_tuning_1 = __nccwpck_require__(7199);
 Object.defineProperty(exports, "FineTuning", ({ enumerable: true, get: function () { return fine_tuning_1.FineTuning; } }));
-var images_1 = __nccwpck_require__(5315);
+var images_1 = __nccwpck_require__(5401);
 Object.defineProperty(exports, "Images", ({ enumerable: true, get: function () { return images_1.Images; } }));
-var models_1 = __nccwpck_require__(5989);
+var models_1 = __nccwpck_require__(4370);
 Object.defineProperty(exports, "ModelsPage", ({ enumerable: true, get: function () { return models_1.ModelsPage; } }));
 Object.defineProperty(exports, "Models", ({ enumerable: true, get: function () { return models_1.Models; } }));
-var moderations_1 = __nccwpck_require__(8810);
+var moderations_1 = __nccwpck_require__(2548);
 Object.defineProperty(exports, "Moderations", ({ enumerable: true, get: function () { return moderations_1.Moderations; } }));
 //# sourceMappingURL=index.js.map
 
 /***/ }),
 
-/***/ 5989:
+/***/ 4370:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44981,30 +45912,30 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ModelsPage = exports.Models = void 0;
-const resource_1 = __nccwpck_require__(6529);
-const ModelsAPI = __importStar(__nccwpck_require__(5989));
-const pagination_1 = __nccwpck_require__(3682);
+const resource_1 = __nccwpck_require__(1879);
+const ModelsAPI = __importStar(__nccwpck_require__(4370));
+const pagination_1 = __nccwpck_require__(1456);
 class Models extends resource_1.APIResource {
     /**
      * Retrieves a model instance, providing basic information about the model such as
      * the owner and permissioning.
      */
     retrieve(model, options) {
-        return this.get(`/models/${model}`, options);
+        return this._client.get(`/models/${model}`, options);
     }
     /**
      * Lists the currently available models, and provides basic information about each
      * one such as the owner and availability.
      */
     list(options) {
-        return this.getAPIList('/models', ModelsPage, options);
+        return this._client.getAPIList('/models', ModelsPage, options);
     }
     /**
      * Delete a fine-tuned model. You must have the Owner role in your organization to
      * delete a model.
      */
     del(model, options) {
-        return this.delete(`/models/${model}`, options);
+        return this._client.delete(`/models/${model}`, options);
     }
 }
 exports.Models = Models;
@@ -45021,7 +45952,7 @@ exports.ModelsPage = ModelsPage;
 
 /***/ }),
 
-/***/ 8810:
+/***/ 2548:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -45029,13 +45960,13 @@ exports.ModelsPage = ModelsPage;
 // File generated from our OpenAPI spec by Stainless.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Moderations = void 0;
-const resource_1 = __nccwpck_require__(6529);
+const resource_1 = __nccwpck_require__(1879);
 class Moderations extends resource_1.APIResource {
     /**
      * Classifies if text violates OpenAI's Content Policy
      */
     create(body, options) {
-        return this.post('/moderations', { body, ...options });
+        return this._client.post('/moderations', { body, ...options });
     }
 }
 exports.Moderations = Moderations;
@@ -45045,16 +45976,27 @@ exports.Moderations = Moderations;
 
 /***/ }),
 
-/***/ 2947:
+/***/ 9458:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// File generated from our OpenAPI spec by Stainless.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=shared.js.map
+
+/***/ }),
+
+/***/ 4439:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Stream = void 0;
-const index_1 = __nccwpck_require__(2272);
-const error_1 = __nccwpck_require__(8817);
-const error_2 = __nccwpck_require__(8817);
+const index_1 = __nccwpck_require__(5168);
+const error_1 = __nccwpck_require__(3092);
+const error_2 = __nccwpck_require__(3092);
 class Stream {
     constructor(iterator, controller) {
         this.iterator = iterator;
@@ -45399,15 +46341,15 @@ function readableStreamAsyncIterable(stream) {
 
 /***/ }),
 
-/***/ 4297:
+/***/ 9278:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createForm = exports.multipartFormRequestOptions = exports.maybeMultipartFormRequestOptions = exports.isMultipartBody = exports.toFile = exports.isUploadable = exports.isBlobLike = exports.isFileLike = exports.isResponseLike = exports.fileFromPath = void 0;
-const index_1 = __nccwpck_require__(2272);
-var index_2 = __nccwpck_require__(2272);
+const index_1 = __nccwpck_require__(5168);
+var index_2 = __nccwpck_require__(5168);
 Object.defineProperty(exports, "fileFromPath", ({ enumerable: true, get: function () { return index_2.fileFromPath; } }));
 const isResponseLike = (value) => value != null &&
     typeof value === 'object' &&
@@ -45568,14 +46510,14 @@ const addFormValue = async (form, key, value) => {
 
 /***/ }),
 
-/***/ 4322:
+/***/ 4348:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VERSION = void 0;
-exports.VERSION = '4.15.4'; // x-release-please-version
+exports.VERSION = '4.19.0'; // x-release-please-version
 //# sourceMappingURL=version.js.map
 
 /***/ }),
