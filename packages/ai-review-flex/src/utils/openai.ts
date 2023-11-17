@@ -14,11 +14,23 @@ export const getTokenCount = (text: string): number => {
 
 export const chat = async (messages: OpenAI.ChatCompletionMessageParam[]) => {
   const tokenCount = messages.reduce((acc, message) => {
-    return acc + getTokenCount(message.content ?? "");
+    const { content } = message;
+    if (content == null) return acc;
+    if (typeof content === "string") {
+      return acc + getTokenCount(content);
+    } else {
+      const tokenCounts = content.reduce((init, c) => {
+        if (c.type === "text") {
+          return init + getTokenCount(c.text);
+        } else {
+          return init;
+        }
+      }, 0);
+      return acc + tokenCounts;
+    }
   }, 0);
 
-  const model = tokenCount * 1.1 + 1024 < 8 * 1024 ? "gpt-4" : "gpt-4-32k";
-  const body = { model, messages, temperature: 0 };
+  const body = { model: "gpt-4-1106-preview", messages, temperature: 0 };
   const response = await openai.chat.completions.create(body, {
     maxRetries: 2,
     timeout: Math.trunc(
