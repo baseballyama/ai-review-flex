@@ -1,5 +1,11 @@
 # AI Review Flex
 
+## 0.3.0
+
+### Minor Changes
+
+- 7918472: feat: use `gpt-4-1106-preview` and entire file is now passed to GPT
+
 ## 0.2.5
 
 ### Patch Changes
