@@ -15,7 +15,7 @@
   "author": "baseballyama",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "20.11.27",
+    "@types/node": "20.11.28",
     "@vercel/ncc": "0.38.1"
   },
   "dependencies": {
