@@ -36,8 +36,8 @@ importers:
         specifier: 20.0.2
         version: 20.0.2
       openai:
-        specifier: 4.19.0
-        version: 4.19.0
+        specifier: 4.29.2
+        version: 4.29.2
       tiktoken-node:
         specifier: 0.0.6
         version: 0.0.6
@@ -2172,8 +2172,8 @@ packages:
       mimic-fn: 4.0.0
     dev: true
 
-  /openai@4.19.0:
-    resolution: {integrity: sha512-cJbl0noZyAaXVKBTMMq6X5BAvP1pm2rWYDBnZes99NL+Zh5/4NmlAwyuhTZEru5SqGGZIoiYKeMPXy4bm9DI0w==}
+  /openai@4.29.2:
+    resolution: {integrity: sha512-cPkT6zjEcE4qU5OW/SoDDuXEsdOLrXlAORhzmaguj5xZSPlgKvLhi27sFWhLKj07Y6WKNWxcwIbzm512FzTBNQ==}
     hasBin: true
     dependencies:
       '@types/node': 18.18.8
