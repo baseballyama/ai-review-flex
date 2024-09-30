@@ -43,8 +43,8 @@ importers:
         version: 0.0.6
     devDependencies:
       '@types/node':
-        specifier: 20.16.9
-        version: 20.16.9
+        specifier: 20.16.10
+        version: 20.16.10
       '@vercel/ncc':
         specifier: 0.38.1
         version: 0.38.1
@@ -796,7 +796,7 @@ packages:
   /@types/node-fetch@2.6.8:
     resolution: {integrity: sha512-nnH5lV9QCMPsbEVdTb5Y+F3GQxLSw1xQgIydrb2gSfEavRPs50FnMr+KUaa+LoPSqibm2N+ZZxH7lavZlAT4GA==}
     dependencies:
-      '@types/node': 20.16.9
+      '@types/node': 20.16.10
       form-data: 4.0.0
     dev: false
 
@@ -810,8 +810,8 @@ packages:
       undici-types: 5.26.5
     dev: false
 
-  /@types/node@20.16.9:
-    resolution: {integrity: sha512-rkvIVJxsOfBejxK7I0FO5sa2WxFmJCzoDwcd88+fq/CUfynNywTo/1/T6hyFz22CyztsnLS9nVlHOnTI36RH5w==}
+  /@types/node@20.16.10:
+    resolution: {integrity: sha512-vQUKgWTjEIRFCvK6CyriPH3MZYiYlNy0fKiEYHWbcoWLEgs4opurGGKlebrTLqdSMIbXImH6XExNiIyNUv3WpA==}
     dependencies:
       undici-types: 6.19.8
 
