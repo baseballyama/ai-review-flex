@@ -23,6 +23,6 @@
     "@actions/github": "6.0.0",
     "@octokit/rest": "20.0.2",
     "openai": "4.19.0",
-    "tiktoken-node": "0.0.6"
+    "tiktoken-node": "0.0.7"
   }
 }
