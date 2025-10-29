@@ -39,8 +39,8 @@ importers:
         specifier: 4.19.0
         version: 4.19.0
       tiktoken-node:
-        specifier: 0.0.6
-        version: 0.0.6
+        specifier: 0.0.7
+        version: 0.0.7
     devDependencies:
       '@types/node':
         specifier: 20.16.15
@@ -1761,8 +1761,8 @@ packages:
     engines: {node: '>=8'}
     dev: true
 
-  /tiktoken-node@0.0.6:
-    resolution: {integrity: sha512-MiprfzPhoKhCflzl0Jyds0VKibAgUGHfJLvBCAXPpum6Lru6ZoKQGsl8lJP0B94LPpby2B2WveOB2tZVfEZQOQ==}
+  /tiktoken-node@0.0.7:
+    resolution: {integrity: sha512-eYtUh1jDLl7TXLj7HXujP+3IPkDieMl1G1HUsG52rysc91YoNw9IIeR4kNoISsc29mk+JDKQ7jEVRN07VOzaDQ==}
     engines: {node: '>= 14'}
     dev: false
 
