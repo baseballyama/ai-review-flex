@@ -46,8 +46,8 @@ importers:
         specifier: 20.16.15
         version: 20.16.15
       '@vercel/ncc':
-        specifier: 0.38.1
-        version: 0.38.1
+        specifier: 0.38.4
+        version: 0.38.4
 
 packages:
 
@@ -838,8 +838,8 @@ packages:
     dependencies:
       undici-types: 6.19.8
 
-  /@vercel/ncc@0.38.1:
-    resolution: {integrity: sha512-IBBb+iI2NLu4VQn3Vwldyi2QwaXt5+hTyh58ggAMoCGE6DJmPvwL3KPBWcJl1m9LYPChBLE980Jw+CS4Wokqxw==}
+  /@vercel/ncc@0.38.4:
+    resolution: {integrity: sha512-8LwjnlP39s08C08J5NstzriPvW1SP8Zfpp1BvC2sI35kPeZnHfxVkCwu4/+Wodgnd60UtT1n8K8zw+Mp7J9JmQ==}
     hasBin: true
     dev: true
 
